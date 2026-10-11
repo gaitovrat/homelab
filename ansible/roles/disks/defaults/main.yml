@@ -1,0 +1,17 @@
+---
+# Disks to mount at <disks_root>/<name>, by filesystem UUID. Set per node in
+# inventory/host_vars/<host>/main.yml; find the UUID with `lsblk -f`.
+#   disks_mounts:
+#     - name: hdd1                       # [a-z0-9]+, the mountpoint's name
+#       uuid: 0f3c...                    # filesystem UUID
+#       fstype: ext4                     # optional, default ext4
+#       options: noatime                 # optional, default noatime
+# A disk that isn't plugged in is fine: it's mounted whenever it shows up.
+disks_mounts: []
+disks_root: /mnt/disks
+disks_default_fstype: ext4
+disks_default_options: noatime
+
+# Spin USB HDDs (sd*) down after this many idle seconds; 0 = never.
+# Applies to every sd* disk, so it doesn't need updating when a disk is swapped.
+disks_spindown_seconds: 600

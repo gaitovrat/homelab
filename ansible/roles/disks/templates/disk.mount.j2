@@ -1,0 +1,14 @@
+# Managed by Ansible (disks role).
+# Not enabled anywhere: 90-homelab-disks.rules starts it when the disk appears
+# (at boot or hot-plugged), so a missing disk never holds up boot. Unplugging
+# the disk stops it (implicit BindsTo= on the device).
+[Unit]
+Description=Data disk {{ item.name }}
+Requires=systemd-fsck@{{ disks_device_escaped[item.name] }}.service
+After=systemd-fsck@{{ disks_device_escaped[item.name] }}.service
+
+[Mount]
+What=/dev/disk/by-uuid/{{ item.uuid }}
+Where={{ disks_root }}/{{ item.name }}
+Type={{ item.fstype | default(disks_default_fstype) }}
+Options={{ item.options | default(disks_default_options) }}

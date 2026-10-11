@@ -1,0 +1,5 @@
+# Managed by Ansible (disks role).
+# Mount each data disk whenever its filesystem appears.
+{% for disk in disks_mounts %}
+ACTION!="remove", SUBSYSTEM=="block", ENV{ID_FS_UUID}=="{{ disk.uuid }}", ENV{SYSTEMD_WANTS}+="{{ disks_mount_unit[disk.name] }}"
+{% endfor %}

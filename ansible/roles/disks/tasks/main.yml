@@ -1,0 +1,150 @@
+---
+- name: Validate disks_mounts
+  ansible.builtin.assert:
+    that:
+      - disk.name is match('^[a-z0-9]+$')
+      - disk.uuid is match('^[0-9A-Fa-f-]+$')
+    fail_msg: "Bad disks_mounts entry {{ disk }}: name must be [a-z0-9]+, uuid a filesystem UUID (lsblk -f)."
+    quiet: true
+  loop: "{{ disks_mounts }}"
+  loop_control:
+    loop_var: disk
+    label: "{{ disk.name | default(disk) }}"
+
+# systemd unit name of each disk's mountpoint, and its /dev/disk/by-uuid
+# path escaped like `systemd-escape --path` ('-' -> '\x2d', '/' -> '-').
+- name: Compute systemd unit names
+  ansible.builtin.set_fact:
+    disks_mount_unit: "{{ disks_mount_unit | default({}) | combine({disk.name: _mount ~ '.mount'}) }}"
+    disks_device_escaped: "{{ disks_device_escaped | default({}) | combine({disk.name: _device}) }}"
+  vars:
+    _mount: "{{ (disks_root ~ '/' ~ disk.name) | regex_replace('^/', '') | replace('-', '\\x2d') | replace('/', '-') }}"
+    _device: "{{ ('/dev/disk/by-uuid/' ~ disk.uuid) | regex_replace('^/', '') | replace('-', '\\x2d') | replace('/', '-') }}"
+  loop: "{{ disks_mounts }}"
+  loop_control:
+    loop_var: disk
+    label: "{{ disk.name }}"
+
+- name: Create disks root
+  ansible.builtin.file:
+    path: "{{ disks_root }}"
+    state: directory
+    mode: "0755"
+
+- name: Check which mountpoints are mounted
+  ansible.builtin.command:
+    argv: [findmnt, --noheadings, --output, SOURCE, --mountpoint, "{{ disks_root }}/{{ disk.name }}"]
+  register: disks_findmnt
+  changed_when: false
+  failed_when: disks_findmnt.rc not in [0, 1]
+  check_mode: false
+  loop: "{{ disks_mounts }}"
+  loop_control:
+    loop_var: disk
+    label: "{{ disk.name }}"
+
+# The bare mountpoint (disk absent) is immutable, so nothing (e.g. a pod's
+# hostPath) can fill the SD card by writing there by mistake. Only touched
+# while unmounted: on a mounted disk this would hit the disk's root instead.
+- name: Create mountpoints
+  ansible.builtin.file:
+    path: "{{ disks_root }}/{{ result.disk.name }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ disks_findmnt.results }}"
+  loop_control:
+    loop_var: result
+    label: "{{ result.disk.name }}"
+  when: result.rc != 0
+
+- name: Read mountpoint attributes
+  ansible.builtin.stat:
+    path: "{{ disks_root }}/{{ result.disk.name }}"
+    get_attributes: true
+  register: disks_mountpoint_stat
+  loop: "{{ disks_findmnt.results }}"
+  loop_control:
+    loop_var: result
+    label: "{{ result.disk.name }}"
+  when: result.rc != 0
+
+# Not the file module's `attributes`: it compares the whole flag set
+# (ext4 dirs also carry `e`), so it would report a change on every run.
+- name: Make mountpoints immutable
+  ansible.builtin.command:
+    argv: [chattr, +i, "{{ item.stat.path }}"]
+  changed_when: true
+  loop: "{{ disks_mountpoint_stat.results }}"
+  loop_control:
+    label: "{{ item.result.disk.name }}"
+  when: item.stat.exists | default(false) and 'immutable' not in item.stat.attributes
+
+- name: Install mount units
+  ansible.builtin.template:
+    src: disk.mount.j2
+    dest: "/etc/systemd/system/{{ disks_mount_unit[item.name] }}"
+    mode: "0644"
+  loop: "{{ disks_mounts }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: disks_units
+
+- name: Install udev rule to mount disks when they appear
+  ansible.builtin.template:
+    src: 90-homelab-disks.rules.j2
+    dest: /etc/udev/rules.d/90-homelab-disks.rules
+    mode: "0644"
+  notify: Reload udev rules
+
+- name: Check which disks are plugged in
+  ansible.builtin.stat:
+    path: "/dev/disk/by-uuid/{{ disk.uuid }}"
+  register: disks_present
+  loop: "{{ disks_mounts }}"
+  loop_control:
+    loop_var: disk
+    label: "{{ disk.name }}"
+
+# Restart on a unit change, so a swapped disk (new UUID) replaces the old
+# mount. On a dry run a new unit isn't written yet, so there's nothing to start.
+- name: Mount plugged-in disks
+  ansible.builtin.systemd_service:
+    name: "{{ disks_mount_unit[item.0.name] }}"
+    state: "{{ 'restarted' if item.1.changed else 'started' }}"
+    daemon_reload: true
+  loop: "{{ disks_mounts | zip(disks_units.results, disks_present.results) }}"
+  loop_control:
+    label: "{{ item.0.name }}"
+  when: item.2.stat.exists and not (ansible_check_mode and item.1.changed)
+
+- name: Warn about disks that aren't plugged in
+  ansible.builtin.debug:
+    msg: >-
+      {{ item.0.name }} (UUID {{ item.0.uuid }}) is not plugged in; it will be
+      mounted at {{ disks_root }}/{{ item.0.name }} when it appears.
+  loop: "{{ disks_mounts | zip(disks_present.results) }}"
+  loop_control:
+    label: "{{ item.0.name }}"
+  when: not item.1.stat.exists
+
+- name: Install hd-idle
+  ansible.builtin.apt:
+    name: hd-idle
+    state: present
+
+# The Debian unit reads HD_IDLE_OPTS and ignores START_HD_IDLE. hd-idle only
+# watches sd* disks; -i without -a is the default for all of them.
+- name: Configure hd-idle
+  ansible.builtin.copy:
+    dest: /etc/default/hd-idle
+    mode: "0644"
+    content: |
+      # Managed by Ansible (disks role).
+      HD_IDLE_OPTS="-i {{ disks_spindown_seconds }}"
+  notify: Restart hd-idle
+
+- name: Enable and start hd-idle
+  ansible.builtin.systemd_service:
+    name: hd-idle
+    enabled: true
+    state: started
