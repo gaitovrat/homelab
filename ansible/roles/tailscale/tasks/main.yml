@@ -37,14 +37,20 @@
     enabled: true
     state: started
 
+# Read-only, so it also runs under --check. On a dry run against a fresh
+# node tailscale isn't installed yet; treat that as not logged in.
 - name: Get Tailscale status
   ansible.builtin.command: tailscale status --json
   register: tailscale_status
   changed_when: false
+  failed_when: tailscale_status.rc != 0 and not ansible_check_mode
+  check_mode: false
 
 - name: Read Tailscale backend state
   ansible.builtin.set_fact:
-    tailscale_backend_state: "{{ (tailscale_status.stdout | from_json).BackendState }}"
+    tailscale_backend_state: >-
+      {{ (tailscale_status.stdout | from_json).BackendState
+         if tailscale_status.rc == 0 else 'NeedsLogin' }}
 
 - name: Require an auth key for the first login
   ansible.builtin.assert:
@@ -53,7 +59,7 @@
       {{ inventory_hostname }} is not logged in to Tailscale. Pass an auth key with
       -e tailscale_authkey=tskey-auth-... or the TAILSCALE_AUTHKEY env var.
     quiet: true
-  when: tailscale_backend_state == 'NeedsLogin'
+  when: tailscale_backend_state == 'NeedsLogin' and not ansible_check_mode
 
 # Skipped once the node is up, so re-runs make no changes. --reset makes the
 # flags below the node's full config.
