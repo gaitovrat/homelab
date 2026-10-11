@@ -1,0 +1,5 @@
+---
+# Nodes are reached by name, never by IP (see decision log). Default: mDNS
+# `<host>.local` on the LAN. Override per node in host_vars/<host>/; put
+# anything that shouldn't be public (e.g. a tailnet name) in its vault.yml.
+ansible_host: "{{ inventory_hostname }}.local"

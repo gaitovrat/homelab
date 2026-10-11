@@ -1,0 +1,11 @@
+---
+galaxy_info:
+  role_name: base
+  author: gaitovrat
+  description: Base OS setup for Raspberry Pi k3s nodes (cgroups, zram swap, volatile journald, unattended upgrades)
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions: [trixie]
+dependencies: []

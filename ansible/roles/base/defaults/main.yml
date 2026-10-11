@@ -1,0 +1,19 @@
+---
+base_packages:
+  - ca-certificates
+  - curl
+  - htop
+  - jq
+
+base_cmdline_path: /boot/firmware/cmdline.txt
+# Memory cgroup is off by default in the Raspberry Pi kernel; k3s needs it.
+base_cmdline_args:
+  - cgroup_memory=1
+  - cgroup_enable=memory
+
+# rpi-swap mechanism. "zram" = compressed RAM swap only; the default "auto"
+# (zram+file) also writes idle pages to /var/swap on the SD card.
+base_swap_mechanism: zram
+
+# Logs live in RAM only (lost on reboot) to spare the SD card.
+base_journald_runtime_max_use: 64M

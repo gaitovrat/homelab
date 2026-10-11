@@ -1,2 +1,5 @@
 ---
 profile: production
+exclude_paths:
+  # Ansible Vault encrypted; CI has no key to decrypt them.
+  - ansible/inventory/**/vault.yml
