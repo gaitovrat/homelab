@@ -1,37 +1,15 @@
 ---
-# The argo-cd chart from argo-helm, pulled as OCI from GHCR.
-argocd_chart: oci://ghcr.io/argoproj/argo-helm/argo-cd
-# renovate: datasource=docker depName=ghcr.io/argoproj/argo-helm/argo-cd
-argocd_chart_version: "10.10.2"
+# Argo CD manages itself through apps/argocd.yaml, and Renovate bumps the
+# chart there. This role only bootstraps a cluster from that same file
+# (chart, version, values), so the two can't drift.
+argocd_apps_dir: "{{ playbook_dir | dirname }}/apps"
+argocd_app: "{{ lookup('ansible.builtin.file', argocd_apps_dir ~ '/argocd.yaml') | from_yaml }}"
+argocd_root_app: "{{ lookup('ansible.builtin.file', argocd_apps_dir ~ '/root.yaml') | from_yaml }}"
 
-argocd_namespace: argocd
+argocd_chart: "oci://{{ argocd_app.spec.source.repoURL }}/{{ argocd_app.spec.source.chart }}"
+argocd_chart_version: "{{ argocd_app.spec.source.targetRevision }}"
+argocd_values: "{{ argocd_app.spec.source.helm.valuesObject }}"
+argocd_namespace: "{{ argocd_app.metadata.namespace }}"
 
-# Lean values for a 4 GB node: no Dex (no SSO yet, local admin only), no
-# notifications controller. Every other component runs a single replica
-# (the chart default), without HA Redis.
-argocd_values:
-  dex:
-    enabled: false
-  notifications:
-    enabled: false
-  controller:
-    replicas: 1
-  server:
-    replicas: 1
-  repoServer:
-    replicas: 1
-  applicationSet:
-    replicas: 1
-  redis-ha:
-    enabled: false
-  configs:
-    cm:
-      # No terminal into pods from the UI.
-      exec.enabled: false
-
-# The root "app of apps": one Argo CD Application per component in
-# `apps/` of this repo. Everything after Argo CD is deployed from there.
-argocd_root_app_name: root
-argocd_root_app_repo: https://github.com/gaitovrat/homelab.git
-argocd_root_app_revision: main
-argocd_root_app_path: apps
+# k3s's auto-deploy directory, used for the bootstrap install only.
+argocd_manifests_dir: /var/lib/rancher/k3s/server/manifests

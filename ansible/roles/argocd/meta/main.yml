@@ -2,7 +2,7 @@
 galaxy_info:
   role_name: argocd
   author: gaitovrat
-  description: Install Argo CD with lean values and apply the root app of apps
+  description: Bootstrap Argo CD and the root app of apps, then hand Argo CD over to itself
   license: MIT
   min_ansible_version: "2.15"
   platforms:
