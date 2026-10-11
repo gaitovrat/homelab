@@ -8,7 +8,7 @@ ansible-playbook site.yml          # Touch ID once, for the vault key
 ansible-playbook site.yml --check  # dry run
 ```
 
-Per-node settings go in `inventory/host_vars/<host>/`: plain values in any `.yml` there, and secrets or anything that shouldn't be public in its encrypted `vault.yml` (see below).
+Per-node settings go in `inventory/host_vars/<host>/`: plain values in any `.yml` there, and secrets in its encrypted `vault.yml` (see below).
 
 ## Secrets: Ansible Vault + 1Password
 
@@ -17,7 +17,7 @@ Secrets live **in the repo, encrypted** with Ansible Vault (AES-256). Nothing se
 | File | Holds |
 |---|---|
 | `inventory/group_vars/all/vault.yml` | secrets shared by all nodes: `tailscale_authkey` |
-| `inventory/host_vars/<host>/vault.yml` | per-node secrets: `ansible_become_password` (sudo password), and `ansible_host` once the node is on the tailnet |
+| `inventory/host_vars/<host>/vault.yml` | per-node secrets: `ansible_become_password` (sudo password) |
 
 Ansible loads both automatically; for the same variable, the host's value wins. All files use the same key (the *vault password*), which is in 1Password, never in the repo.
 
@@ -55,14 +55,11 @@ Keep the key safe: anyone with it and repo access can decrypt every secret here.
 
 ## How nodes are addressed
 
-By name only, never by IP. `ansible_host` defaults to `<inventory_hostname>.local` (mDNS, e.g. `k3s-01.local`, home LAN only), set in `group_vars/all/main.yml`. To reach a node another way, set `ansible_host` in its `host_vars/<host>/`, in `vault.yml` if the name shouldn't be public. For one run: `-e ansible_host=...` (with `--limit <host>`).
+By name only, never by IP, and only over Tailscale. `group_vars/all/main.yml` sets `tailnet_domain` and makes `ansible_host` the node's MagicDNS name, `<inventory_hostname>.<tailnet_domain>` (e.g. `k3s-01.tailbc9346.ts.net`). It works from anywhere the laptop is on the tailnet.
 
-| `ansible_host` | Resolves via | Works from |
-|---|---|---|
-| `k3s-01.local` (default) | mDNS | home LAN only |
-| `k3s-01.<tailnet>.ts.net` (in the node's `vault.yml`) | Tailscale MagicDNS | anywhere the laptop is on the tailnet |
+The one exception is a node's first run, before it's on the tailnet: point that run at mDNS on the LAN with `-e ansible_host=<host>.local --limit <host>` (see [Tailscale first run](#first-run-node-not-on-the-tailnet-yet)).
 
-If your SSH user differs from your local username, set `ansible_user` the same way.
+Per-node overrides (e.g. `ansible_user`, if your SSH user differs from your local username) go in `host_vars/<host>/`.
 
 ## Roles
 
@@ -82,15 +79,15 @@ If your SSH user differs from your local username, set `ansible_user` the same w
    ansible-vault create inventory/group_vars/all/vault.yml   # tailscale_authkey: tskey-auth-...
    ```
 
-3. Run over the LAN (the node's `ansible_host` is still `<host>.local`):
+3. Add the node to `inventory/hosts.yml`, then run it once over the LAN via mDNS (it has no MagicDNS name yet):
 
    ```sh
-   ansible-playbook site.yml --limit k3s-01
+   ansible-playbook site.yml --limit k3s-02 -e ansible_host=k3s-02.local
    ```
 
    The key is never logged (`no_log`) and only used for a node's first login: later runs see the node is up and skip `tailscale up`. When the key expires, nodes already on the tailnet are unaffected; generate a new one and `ansible-vault edit` it in before onboarding the next node. You can also revoke it in the console once all nodes have joined.
 4. In the [Machines](https://login.tailscale.com/admin/machines) page, open the node → **Disable key expiry**. Otherwise the node drops off the tailnet when its key expires (180 days by default).
-5. Point Ansible at the tailnet: `ansible-vault edit inventory/host_vars/k3s-01/vault.yml` and add `ansible_host: k3s-01.<tailnet>.ts.net` (tailnet name from the [DNS](https://login.tailscale.com/admin/dns) page). It's in the vault so the tailnet name stays out of this public repo. Later runs, `ssh` and kubectl then go over the tailnet.
+5. Check the node's name on the Machines page is exactly its inventory name (not `k3s-02-1`). From now on plain `ansible-playbook site.yml`, `ssh` and kubectl reach it over the tailnet.
 
 The node runs with `--accept-dns=false`: it never needs to resolve tailnet names, and this keeps its DNS (and so k3s CoreDNS) independent of `tailscaled`.
 
@@ -98,9 +95,8 @@ The node runs with `--accept-dns=false`: it never needs to resolve tailnet names
 
 ```sh
 ansible-playbook site.yml                      # second run: changed=0
-ssh k3s-01.local 'cat /sys/fs/cgroup/cgroup.controllers; cat /proc/swaps; ls /var/swap'
+ssh k3s-01.tailbc9346.ts.net 'cat /sys/fs/cgroup/cgroup.controllers; cat /proc/swaps; ls /var/swap'
 # expect "memory" in the controllers, only /dev/zram0 as swap, and no /var/swap
 
-tailscale status                                 # k3s-01 listed, online
-ssh k3s-01.<tailnet>.ts.net                      # also from outside home, e.g. phone hotspot
+tailscale status                               # k3s-01 listed, online
 ```
