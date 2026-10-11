@@ -8,3 +8,4 @@
     - tailscale
     - disks
     - k3s
+    - argocd
