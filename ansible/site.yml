@@ -7,3 +7,4 @@
     - base
     - tailscale
     - disks
+    - k3s

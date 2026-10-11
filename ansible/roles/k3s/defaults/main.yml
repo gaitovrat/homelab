@@ -1,0 +1,23 @@
+---
+# Also pins the install script (fetched from the same tag).
+# renovate: datasource=github-releases depName=k3s-io/k3s versioning=regex:^v(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)\+k3s(?<build>\d+)$
+k3s_version: "v1.36.5+k3s1"
+
+k3s_install_script_url: "https://raw.githubusercontent.com/k3s-io/k3s/{{ k3s_version }}/install.sh"
+
+# Names and IPs the API server certificate is valid for, besides the
+# defaults (hostname, LAN IP, 127.0.0.1). The tailnet IPv4 is read from the
+# node at run time, so it never lands in this repo.
+k3s_tls_san:
+  - "{{ inventory_hostname }}.{{ tailnet_domain }}"
+
+# Readable by the admin user on the node, so `kubectl` there needs no sudo.
+k3s_write_kubeconfig_mode: "0644"
+
+# The cluster is merged into this kubeconfig on the machine running Ansible,
+# as a cluster, user and context all named k3s_cluster_name. Other entries
+# in the file are left alone. Never commit it.
+k3s_kubeconfig_dest: "{{ lookup('ansible.builtin.env', 'HOME') }}/.kube/config"
+k3s_cluster_name: homelab
+# Where that context points kubectl: the server's MagicDNS name.
+k3s_kubeconfig_server: "https://{{ inventory_hostname }}.{{ tailnet_domain }}:6443"

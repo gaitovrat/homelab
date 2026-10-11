@@ -1,0 +1,8 @@
+# Managed by Ansible (roles/k3s). k3s reads this at start.
+# Single server with the default sqlite datastore (no cluster-init), and the
+# bundled Traefik, local-path provisioner and metrics-server (none disabled).
+write-kubeconfig-mode: "{{ k3s_write_kubeconfig_mode }}"
+tls-san:
+{% for san in k3s_tls_san + k3s_tailnet_ips %}
+  - "{{ san }}"
+{% endfor %}
