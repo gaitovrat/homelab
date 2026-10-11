@@ -3,7 +3,9 @@
 # shouldn't be in this public repo.
 
 # Domain the nodes are reached under; unset means mDNS on the LAN (.local).
-# homelab_domain: local
+# Once a node is on the tailnet, set the MagicDNS domain from
+# https://login.tailscale.com/admin/dns ("Tailnet name") to go over Tailscale.
+# homelab_domain: tailXXXX.ts.net
 
 # SSH user, if it differs from your local username.
 # ansible_user: CHANGEME

@@ -4,3 +4,11 @@ tailscale_version: "1.104.1"
 
 tailscale_apt_url: https://pkgs.tailscale.com/stable/debian
 tailscale_apt_codename: "{{ ansible_facts['distribution_release'] }}"
+
+# Only needed for the first login. Pass at run time (-e tailscale_authkey=...
+# or the TAILSCALE_AUTHKEY env var); never commit it.
+tailscale_authkey: "{{ lookup('ansible.builtin.env', 'TAILSCALE_AUTHKEY') }}"
+tailscale_hostname: "{{ inventory_hostname }}"
+# The node never needs to resolve tailnet names; keep its DNS (and so the
+# k3s CoreDNS upstream) independent of tailscaled.
+tailscale_accept_dns: false
