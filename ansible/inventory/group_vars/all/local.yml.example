@@ -7,3 +7,7 @@
 
 # SSH user, if it differs from your local username.
 # ansible_user: CHANGEME
+
+# sudo password from 1Password via the op CLI, instead of passing -K.
+# Use the item's "Copy Secret Reference" in 1Password for the op:// path.
+# ansible_become_password: "{{ lookup('ansible.builtin.pipe', 'op read \"op://Private/k3s-01/password\"') }}"
