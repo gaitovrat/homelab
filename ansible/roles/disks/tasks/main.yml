@@ -79,6 +79,14 @@
     label: "{{ item.result.disk.name }}"
   when: item.stat.exists | default(false) and 'immutable' not in item.stat.attributes
 
+# fsck.exfat, so systemd-fsck can repair an exFAT disk (no journal) that was
+# unplugged without unmounting.
+- name: Install exFAT tools
+  ansible.builtin.apt:
+    name: exfatprogs
+    state: present
+  when: disks_mounts | selectattr('fstype', 'defined') | selectattr('fstype', '==', 'exfat') | list | length > 0
+
 - name: Install mount units
   ansible.builtin.template:
     src: disk.mount.j2

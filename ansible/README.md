@@ -104,13 +104,23 @@ Each data disk is listed per node in `inventory/host_vars/<host>/main.yml`:
 
 ```yaml
 disks_mounts:
-  - name: hdd1                                   # mounted at /mnt/disks/hdd1
-    uuid: 3f1c2a9e-7b4d-4e0a-9c55-1a2b3c4d5e6f   # filesystem UUID, from `lsblk -f`
-    # fstype: ext4      (default)
-    # options: noatime  (default)
+  - name: hdd1                  # mounted at /mnt/disks/hdd1
+    uuid: 0C5F-09C7             # filesystem UUID, from `lsblk -f`
+    fstype: exfat               # default ext4
+    options: noatime,uid=1000,gid=1000,fmask=0022,dmask=0022   # default noatime
 ```
 
-A filesystem UUID is not a secret, so it lives in plain text. Use ext4: k8s pods need Unix owners and permissions, which exFAT/NTFS don't have.
+A filesystem UUID is not a secret, so it lives in plain text. It changes only when the disk is reformatted.
+
+### ext4 or exFAT
+
+k3s-01's HDD is **exFAT**, so it can be unplugged and read on macOS or Windows as is. That's fine for plain files (FileBrowser, backups), with these trade-offs:
+
+- **No Unix owners or permissions.** Every file shows the `uid`/`gid` and masks from the mount options (here 1000, the admin user, `rwxr-xr-x`). Pods that write to the disk must run as uid 1000; `chown`/`chmod` inside it fail or do nothing.
+- **No journal.** A disk pulled out mid-write can be left inconsistent. The role installs `exfatprogs`, so `fsck.exfat` repairs it automatically next time it's mounted. Still, prefer `sudo systemctl stop mnt-disks-hdd1.mount` before unplugging.
+- **No symlinks, hard links or special files.** So no k8s PVs for databases, and no `rsync -aHAX` onto it.
+
+Use ext4 for a disk that only the Pi uses, or that needs any of the above.
 
 ### Unplugged or replaced disks
 
@@ -123,17 +133,17 @@ A data disk can be missing at any time, and nothing depends on it being there:
 
 Pods that use a disk through `hostPath` should set `mountPropagation: HostToContainer`. Without it, a pod keeps the mount it started with, and only a pod restart picks up a disk that was re-plugged.
 
-To **add or replace** a disk (this wipes the new disk):
+To **add or replace** a disk, plug it into the Pi and read its UUID with `ssh k3s-01.tailbc9346.ts.net lsblk -f`. A disk already formatted exFAT (e.g. on a Mac, with Disk Utility → Erase → ExFAT, GUID scheme) needs nothing else. To format it on the Pi instead (this wipes it):
 
 ```sh
 ssh k3s-01.tailbc9346.ts.net
-lsblk -f                                        # find the new disk, e.g. /dev/sdb; check it's the right one
-echo 'type=linux' | sudo sfdisk --label gpt /dev/sdb   # one partition, whole disk
-sudo mkfs.ext4 -L hdd1 -m 0 /dev/sdb1           # -m 0: no root reserve on a data disk
-lsblk -f /dev/sdb                               # copy the UUID
+lsblk -f                                                 # find the new disk, e.g. /dev/sdb; check it's the right one
+echo 'type=linux' | sudo sfdisk --label gpt /dev/sdb     # one partition, whole disk
+sudo mkfs.exfat -L Backup /dev/sdb1                      # or: sudo mkfs.ext4 -L hdd1 -m 0 /dev/sdb1
+lsblk -f /dev/sdb                                        # copy the UUID
 ```
 
-Put the UUID into `host_vars/<host>/main.yml` and run `ansible-playbook site.yml`. When an entry's UUID changes, the mount unit is restarted, so the new disk replaces the old one at the same path. Copy data over first if the old disk still works: mount the new disk somewhere temporary (`sudo mount /dev/sdb1 /mnt/new`) and `rsync -aHAX /mnt/disks/hdd1/ /mnt/new/`. Removing an entry from `disks_mounts` doesn't clean up its unit or mountpoint on the node; do that by hand.
+Put the UUID (and `fstype`/`options`) into `host_vars/<host>/main.yml` and run `ansible-playbook site.yml`. When an entry's UUID changes, the mount unit is restarted, so the new disk replaces the old one at the same path. Copy data over first if the old disk still works: mount the new disk somewhere temporary and `rsync -rt /mnt/disks/hdd1/ /mnt/new/` (`-rt`, since exFAT can't hold owners or links). Removing an entry from `disks_mounts` doesn't clean up its unit or mountpoint on the node; do that by hand.
 
 ## Check
 
