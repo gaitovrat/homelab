@@ -2,6 +2,14 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
   "dependencyDashboard": true,
+  "packageRules": [
+    {
+      "description": "Lint CI Python: stay within what the pinned ansible-core supports (2.21: <=3.14); raise with ansible-core",
+      "matchManagers": ["github-actions"],
+      "matchDepNames": ["python"],
+      "allowedVersions": "<3.15"
+    }
+  ],
   "customManagers": [
     {
       "customType": "regex",
