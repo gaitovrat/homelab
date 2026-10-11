@@ -12,7 +12,7 @@ Optional per-machine settings (SSH user, domain) go in `inventory/group_vars/all
 
 ## Secrets: Ansible Vault + 1Password
 
-Secrets live **in the repo, encrypted** with Ansible Vault (AES-256) in `inventory/group_vars/all/vault.yml`. Right now that's only `ansible_become_password`, the sudo password, the same on every node. The key that decrypts the file (the *vault password*) is in 1Password, never in the repo.
+Secrets live **in the repo, encrypted** with Ansible Vault (AES-256), one file per node: `inventory/host_vars/<host>/vault.yml`. Right now that's only `ansible_become_password`, the node's sudo password, which differs per node. Ansible loads `host_vars/<inventory_hostname>/` automatically. A `group_vars/all/vault.yml` can hold a shared fallback; host values win. All files use the same key (the *vault password*), which is in 1Password, never in the repo.
 
 `ansible.cfg` sets `vault_password_file = vault-pass.sh`. Ansible runs that script, it prints the key via `op read`, and the vault decrypts with no prompt. The 1Password reference defaults to `op://Private/homelab-ansible-vault/password`; set `ANSIBLE_VAULT_OP_REF` to use another.
 
@@ -27,23 +27,24 @@ Secrets live **in the repo, encrypted** with Ansible Vault (AES-256) in `invento
    ./vault-pass.sh >/dev/null && echo ok   # the script can read it
    ```
 
-3. Create the encrypted file (opens `$EDITOR`; write `ansible_become_password: <sudo password>`, save, quit):
+3. For each node, create its encrypted file (opens `$EDITOR`; write `ansible_become_password: <that node's sudo password>`, save, quit):
 
    ```sh
-   ansible-vault create inventory/group_vars/all/vault.yml
+   mkdir -p inventory/host_vars/k3s-01
+   ansible-vault create inventory/host_vars/k3s-01/vault.yml
    ```
 
-   Commit `vault.yml`: it's encrypted (`$ANSIBLE_VAULT;1.1;AES256` header), so it's safe in this public repo.
+   Commit it: it's encrypted (`$ANSIBLE_VAULT;1.1;AES256` header), so it's safe in this public repo.
 
 ### Day to day
 
 ```sh
-ansible-vault view inventory/group_vars/all/vault.yml   # read
-ansible-vault edit inventory/group_vars/all/vault.yml   # change (re-encrypts on save)
-ansible-vault rekey inventory/group_vars/all/vault.yml  # after rotating the key in 1Password
+ansible-vault view inventory/host_vars/k3s-01/vault.yml    # read
+ansible-vault edit inventory/host_vars/k3s-01/vault.yml    # change (re-encrypts on save)
+ansible-vault rekey inventory/host_vars/*/vault.yml        # after rotating the key in 1Password
 ```
 
-Keep the key safe: anyone with it and repo access can decrypt every secret here. Losing it means re-creating `vault.yml`. No 1Password at hand? `ansible-playbook site.yml --ask-vault-pass` prompts for the key instead.
+Keep the key safe: anyone with it and repo access can decrypt every secret here. Losing it means re-creating the vault files. No 1Password at hand? `ansible-playbook site.yml --ask-vault-pass` prompts for the key instead.
 
 ## How nodes are addressed
 
