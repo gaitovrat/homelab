@@ -1,0 +1,38 @@
+---
+- name: Install deb822_repository prerequisites
+  ansible.builtin.apt:
+    name: python3-debian
+    state: present
+
+- name: Add Tailscale apt repository
+  ansible.builtin.deb822_repository:
+    name: tailscale
+    types: deb
+    uris: "{{ tailscale_apt_url }}"
+    suites: "{{ tailscale_apt_codename }}"
+    components: main
+    signed_by: "{{ tailscale_apt_url }}/{{ tailscale_apt_codename }}.gpg"
+
+# Keep `apt upgrade` from moving tailscale off the version pinned here;
+# bumps come through Renovate PRs against tailscale_version.
+- name: Pin Tailscale version in apt
+  ansible.builtin.copy:
+    dest: /etc/apt/preferences.d/tailscale
+    mode: "0644"
+    content: |
+      Package: tailscale
+      Pin: version {{ tailscale_version }}
+      Pin-Priority: 1001
+
+- name: Install Tailscale
+  ansible.builtin.apt:
+    name: "tailscale={{ tailscale_version }}"
+    state: present
+    update_cache: true
+    allow_downgrade: true
+
+- name: Enable and start tailscaled
+  ansible.builtin.systemd_service:
+    name: tailscaled
+    enabled: true
+    state: started
