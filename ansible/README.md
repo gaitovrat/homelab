@@ -127,7 +127,7 @@ Use ext4 for a disk that only the Pi uses, or that needs any of the above.
 A data disk can be missing at any time, and nothing depends on it being there:
 
 - **Not plugged in at boot:** boot doesn't wait for it. The disk gets a systemd mount unit (`mnt-disks-<name>.mount`) that nothing enables. A udev rule (`/etc/udev/rules.d/90-homelab-disks.rules`) starts that unit when a filesystem with its UUID appears, at boot or hot-plugged later. Ansible prints a warning and carries on.
-- **Unplugged while running:** systemd unmounts it (the mount is bound to the device), so there's no stale mount. Plug it back in and it's fsck'd and mounted again.
+- **Unplugged while running:** systemd unmounts it (the mount unit stops when its device goes away), so there's no stale mount. Plug it back in and it's fsck'd and mounted again.
 - **Empty mountpoint:** while no disk is mounted, `/mnt/disks/<name>` is an empty, immutable (`chattr +i`) directory on the SD card. Writes there fail instead of quietly filling the SD card.
 - **Spindown:** `hd-idle` applies to every `sd*` disk, not to one device name, so it covers a replacement disk with no changes.
 

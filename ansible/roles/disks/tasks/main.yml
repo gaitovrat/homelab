@@ -135,21 +135,40 @@
     label: "{{ item.0.name }}"
   when: not item.1.stat.exists
 
-- name: Install hd-idle
-  ansible.builtin.apt:
-    name: hd-idle
-    state: present
-
-# The Debian unit reads HD_IDLE_OPTS and ignores START_HD_IDLE. hd-idle only
-# watches sd* disks; -i without -a is the default for all of them.
+# Written before the package is installed: its postinst starts hd-idle right
+# away, and with the package's own file (START_HD_IDLE=false, which hd-idle
+# itself reads) it exits at once, Restart=always loops, and systemd blocks
+# further starts. apt keeps this existing file (dpkg --force-confold).
+# hd-idle only watches sd* disks; -i without -a is the default for all of them.
 - name: Configure hd-idle
   ansible.builtin.copy:
     dest: /etc/default/hd-idle
     mode: "0644"
     content: |
       # Managed by Ansible (disks role).
+      START_HD_IDLE=true
       HD_IDLE_OPTS="-i {{ disks_spindown_seconds }}"
   notify: Restart hd-idle
+
+- name: Install hd-idle
+  ansible.builtin.apt:
+    name: hd-idle
+    state: present
+
+# Clears a start-limit-hit left by a crash loop (e.g. from an earlier run that
+# installed the package before configuring it); otherwise starting it fails.
+# systemctl: no module checks for or resets a failed unit.
+- name: Check whether hd-idle has failed
+  ansible.builtin.command: systemctl is-failed --quiet hd-idle.service  # noqa: command-instead-of-module
+  register: disks_hd_idle_failed
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Reset failed hd-idle
+  ansible.builtin.command: systemctl reset-failed hd-idle.service
+  changed_when: true
+  when: disks_hd_idle_failed.rc == 0
 
 - name: Enable and start hd-idle
   ansible.builtin.systemd_service:

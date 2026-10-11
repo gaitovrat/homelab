@@ -1,7 +1,8 @@
 # Managed by Ansible (disks role).
 # Not enabled anywhere: 90-homelab-disks.rules starts it when the disk appears
 # (at boot or hot-plugged), so a missing disk never holds up boot. Unplugging
-# the disk stops it (implicit BindsTo= on the device).
+# the disk stops it: systemd gives mount units loaded from a unit file
+# StopPropagatedFrom= on their device.
 [Unit]
 Description=Data disk {{ item.name }}
 Requires=systemd-fsck@{{ disks_device_escaped[item.name] }}.service
