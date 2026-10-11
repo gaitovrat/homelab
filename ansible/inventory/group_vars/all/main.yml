@@ -1,7 +1,5 @@
 ---
-# Nodes are reached by name, never by IP (see decision log): mDNS
-# `<host>.local` on the LAN by default, or the Tailscale MagicDNS name
-# `<host>.<tailnet>.ts.net`. Set homelab_domain in the gitignored local.yml
-# (see local.yml.example) or with -e; the tailnet name stays out of this
-# public repo.
-ansible_host: "{{ inventory_hostname }}.{{ homelab_domain | default('local') }}"
+# Nodes are reached by name, never by IP (see decision log). Default: mDNS
+# `<host>.local` on the LAN. Override per node in host_vars/<host>/; put
+# anything that shouldn't be public (e.g. a tailnet name) in its vault.yml.
+ansible_host: "{{ inventory_hostname }}.local"

@@ -1,2 +1,0 @@
-# Per-machine Ansible vars: tailnet name, SSH user
-ansible/inventory/group_vars/all/local.yml

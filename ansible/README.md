@@ -8,7 +8,7 @@ ansible-playbook site.yml          # Touch ID once, for the vault key
 ansible-playbook site.yml --check  # dry run
 ```
 
-Optional per-machine settings (SSH user, domain) go in `inventory/group_vars/all/local.yml`, which is gitignored; see `local.yml.example`.
+Per-node settings go in `inventory/host_vars/<host>/`: plain values in any `.yml` there, and secrets or anything that shouldn't be public in its encrypted `vault.yml` (see below).
 
 ## Secrets: Ansible Vault + 1Password
 
@@ -48,14 +48,14 @@ Keep the key safe: anyone with it and repo access can decrypt every secret here.
 
 ## How nodes are addressed
 
-By name only, never by IP: `ansible_host` is `<inventory_hostname>.<homelab_domain>`.
+By name only, never by IP. `ansible_host` defaults to `<inventory_hostname>.local` (mDNS, e.g. `k3s-01.local`, home LAN only), set in `group_vars/all/main.yml`. To reach a node another way, set `ansible_host` in its `host_vars/<host>/`, in `vault.yml` if the name shouldn't be public. For one run: `-e ansible_host=...` (with `--limit <host>`).
 
-| `homelab_domain` | Resolves via | Works from |
+| `ansible_host` | Resolves via | Works from |
 |---|---|---|
-| unset / `local` | mDNS (`k3s-01.local`) | home LAN only |
-| `<tailnet>.ts.net` | Tailscale MagicDNS (`k3s-01.<tailnet>.ts.net`) | anywhere the laptop is on the tailnet |
+| `k3s-01.local` (default) | mDNS | home LAN only |
+| `k3s-01.<tailnet>.ts.net` (in the node's `vault.yml`) | Tailscale MagicDNS | anywhere the laptop is on the tailnet |
 
-Override for one run with `-e homelab_domain=local`.
+If your SSH user differs from your local username, set `ansible_user` the same way.
 
 ## Roles
 
@@ -69,15 +69,15 @@ Override for one run with `-e homelab_domain=local`.
 ### First run (node not on the tailnet yet)
 
 1. In the [admin console → Settings → Keys](https://login.tailscale.com/admin/settings/keys), generate an auth key: one-off (not reusable), not ephemeral.
-2. Run over the LAN, passing the key at run time. The leading space keeps it out of shell history (zsh `setopt HIST_IGNORE_SPACE`, bash `HISTCONTROL=ignorespace`):
+2. Run over the LAN (the node's `ansible_host` is still `<host>.local`), passing the key at run time. The leading space keeps it out of shell history (zsh `setopt HIST_IGNORE_SPACE`, bash `HISTCONTROL=ignorespace`):
 
    ```sh
-    TAILSCALE_AUTHKEY=tskey-auth-... ansible-playbook site.yml -e homelab_domain=local
+    TAILSCALE_AUTHKEY=tskey-auth-... ansible-playbook site.yml --limit k3s-01
    ```
 
    `-e tailscale_authkey=...` works too. The key is never logged (`no_log`) and only needed for the first login: later runs see the node is up and skip `tailscale up`.
 3. In the [Machines](https://login.tailscale.com/admin/machines) page, open the node → **Disable key expiry**. Otherwise the node drops off the tailnet when its key expires (180 days by default).
-4. Set `homelab_domain` in `local.yml` to the tailnet name (from the [DNS](https://login.tailscale.com/admin/dns) page), so later runs, `ssh` and kubectl go over the tailnet.
+4. Point Ansible at the tailnet: `ansible-vault edit inventory/host_vars/k3s-01/vault.yml` and add `ansible_host: k3s-01.<tailnet>.ts.net` (tailnet name from the [DNS](https://login.tailscale.com/admin/dns) page). It's in the vault so the tailnet name stays out of this public repo. Later runs, `ssh` and kubectl then go over the tailnet.
 
 The node runs with `--accept-dns=false`: it never needs to resolve tailnet names, and this keeps its DNS (and so k3s CoreDNS) independent of `tailscaled`.
 
