@@ -74,7 +74,7 @@ Per-node overrides (e.g. `ansible_user`, if your SSH user differs from your loca
 | `tailscale` | Official apt repo, pinned `tailscale` (Renovate bumps it), `tailscaled` enabled; `tailscale up` with the node's inventory name, skipped once the node is up. |
 | `disks` | Mounts the node's `disks_mounts` at `/mnt/disks/<name>` by filesystem UUID, whenever the disk is plugged in (see [Disks](#disks)); spins USB HDDs down after 10 min idle (`hd-idle`). Never formats anything. |
 | `k3s` | Pinned single-node k3s server (sqlite, Traefik, local-path, metrics-server); API certificate valid for the node's MagicDNS name and tailnet IP; merges the cluster into `~/.kube/config` on the laptop as context `homelab` (see [k3s](#k3s)). |
-| `argocd` | Pinned Argo CD chart with lean values (no Dex, no notifications, single replicas), installed by k3s's helm-controller; the root app of apps that deploys everything in `apps/` (see [Argo CD](#argo-cd)). |
+| `argocd` | Bootstraps Argo CD from [`apps/argocd.yaml`](../apps/argocd.yaml) (pinned chart, lean values: no Dex, no notifications, single replicas) through k3s's helm-controller, applies the root app of apps, then hands Argo CD over to itself (see [Argo CD](#argo-cd)). |
 
 ## Tailscale
 
@@ -164,14 +164,19 @@ Uninstall (wipes the cluster and its local-path volumes): `ssh k3s-01.tailbc9346
 
 ## Argo CD
 
-The last thing Ansible installs; everything after it is deployed from Git. The role writes two files into k3s's auto-deploy directory (`/var/lib/rancher/k3s/server/manifests/`), and k3s applies them, re-checking every 15s:
+The last thing Ansible installs; everything after it, Argo CD included, is deployed from Git. Argo CD manages itself through the `argocd` Application in [`apps/argocd.yaml`](../apps/argocd.yaml): the `argo-cd` chart (`ghcr.io/argoproj/argo-helm`), its pinned version and its values (no Dex, no notifications, one replica of everything, no HA Redis, no exec terminal in the UI). The role reads chart, version and values from that same file, so bootstrap and Git never disagree.
 
-- `argocd.yaml`: a `HelmChart` for the `argo-cd` chart (`oci://ghcr.io/argoproj/argo-helm/argo-cd`). k3s's bundled helm-controller installs it into the `argocd` namespace as release `argocd`, so no `helm` binary is needed. Values are `argocd_values` in `roles/argocd/defaults/main.yml`: no Dex, no notifications, one replica of everything, no HA Redis, no exec terminal in the UI. A failed upgrade is left as is and retried on the next change, never uninstalled.
-- `argocd-root-app.yaml`: the root Application `root`, which syncs every Application in [`apps/`](../apps/) on `main` with prune and self-heal. It has no finalizer, so deleting it leaves the child apps running.
+A run does one of two things:
 
-The run waits until the pinned chart version is deployed, Argo CD is ready and `root` is Synced.
+- **Bootstrap** (no `argocd` Application yet):
+  1. Writes a `HelmChart` to k3s's auto-deploy directory (`/var/lib/rancher/k3s/server/manifests/argocd.yaml`). k3s's bundled helm-controller installs the chart into the `argocd` namespace as release `argocd`, so no `helm` binary is needed. Waits until that version is deployed and ready.
+  2. Applies the root Application `root` from [`apps/root.yaml`](../apps/root.yaml). It syncs every Application in `apps/` on `main` (`root` itself too) with prune and self-heal, so it creates `argocd`. `argocd` renders the same chart with the same release name, so it adopts the running resources instead of creating new ones.
+  3. Waits until `argocd` is Healthy and Synced, then hands over: deletes the Helm release records (`sh.helm.release.v1.argocd.*` secrets), removes the manifest file and deletes the `HelmChart`. The release records go first: deleting a `HelmChart` makes helm-controller run `helm uninstall`, which then finds no release and leaves the workloads alone. The file goes too, because k3s re-applies it on restart (deleting a file alone doesn't delete what k3s applied from it).
+- **Already self-managed:** only waits for `argocd` and `root` to be Healthy and Synced. Nothing is installed or changed.
 
-- **Version:** `argocd_chart_version` in `roles/argocd/defaults/main.yml`. Renovate opens a PR for new chart versions; merge it and run `site.yml` to upgrade. Changing the values works the same way. Argo CD doesn't manage itself: Ansible owns its install, Argo CD owns everything in `apps/`.
+A cluster bootstrapped by an earlier version of this role (`HelmChart` plus a k3s-applied `root`) goes through the same steps on its next run, once `apps/argocd.yaml` is on `main`.
+
+- **Version and values:** edit `apps/argocd.yaml`. Renovate opens a PR for new chart versions; after merge Argo CD syncs and upgrades itself. No Ansible run needed.
 - **UI:** not exposed yet (that comes with Cloudflare Tunnel + Access). Until then, port-forward over the tailnet and log in as `admin` with the generated initial password:
 
   ```sh
@@ -179,7 +184,8 @@ The run waits until the pinned chart version is deployed, Argo CD is ready and `
   kubectl --context homelab -n argocd port-forward svc/argocd-server 8080:443   # https://localhost:8080
   ```
 
-- **Uninstall:** `ssh k3s-01.tailbc9346.ts.net sudo rm /var/lib/rancher/k3s/server/manifests/argocd{,-root-app}.yaml`. k3s then deletes the release and the root app; the CRDs, and so the child Applications, stay until deleted by hand.
+- **Breaking Argo CD from Git:** a bad change to `apps/argocd.yaml` can stop Argo CD from syncing its own fix. Revert it, then apply the fixed Application by hand: `kubectl --context homelab apply -f apps/argocd.yaml`. If Argo CD is down altogether, render and apply the chart yourself: `helm template argocd oci://ghcr.io/argoproj/argo-helm/argo-cd --version <v> -n argocd -f <values> | kubectl --context homelab apply --server-side -f -`.
+- **Uninstall:** delete the `argocd` and `root` Applications (no finalizers, so the workloads stay), then delete the `argocd` namespace. The CRDs, and so any Application objects, stay until deleted by hand.
 
 ## Check
 
@@ -197,5 +203,6 @@ ssh k3s-01.tailbc9346.ts.net 'findmnt /mnt/disks/hdd1; systemctl is-active hd-id
 kubectl --context homelab get nodes -o wide         # k3s-01 Ready at the pinned version; works from outside home too
 kubectl --context homelab top nodes                 # metrics-server answers
 kubectl --context homelab -n kube-system get pods   # coredns, traefik, local-path-provisioner, metrics-server Running
-kubectl --context homelab -n argocd get pods,applications   # argocd-* Running, root Synced
+kubectl --context homelab -n argocd get pods,applications   # argocd-* Running; argocd and root Synced, Healthy
+kubectl --context homelab -n kube-system get helmchart argocd   # NotFound: Argo CD manages itself
 ```

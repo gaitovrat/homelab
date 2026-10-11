@@ -1,53 +1,107 @@
 ---
-# Both go through k3s's auto-deploy manifests directory: k3s applies each
-# file (re-checking every 15s), and its bundled helm-controller runs the
-# chart install. No helm binary or Kubernetes libraries needed anywhere.
-# Removing a file there deletes what it created.
-- name: Install Argo CD chart {{ argocd_chart_version }}
-  ansible.builtin.template:
-    src: argocd.yaml.j2
-    dest: /var/lib/rancher/k3s/server/manifests/argocd.yaml
-    mode: "0600"
+# Bootstrap, then hand over: Ansible installs Argo CD once through k3s's
+# helm-controller, applies the root app, and once the `argocd` Application
+# (apps/argocd.yaml) has adopted the install, drops the helm-controller
+# side. From then on Argo CD upgrades itself from Git, and this role only
+# checks it's healthy.
+- name: Check whether Argo CD manages itself
+  ansible.builtin.command: k3s kubectl --namespace={{ argocd_namespace }} get application/argocd --ignore-not-found --output=name
+  register: argocd_self_app
+  changed_when: false
+  check_mode: false
 
-- name: Apply the root app of apps
-  ansible.builtin.template:
-    src: root-app.yaml.j2
-    dest: /var/lib/rancher/k3s/server/manifests/argocd-root-app.yaml
-    mode: "0600"
+- name: Check for the bootstrap HelmChart
+  ansible.builtin.command: k3s kubectl --namespace=kube-system get helmchart/argocd --ignore-not-found --output=name
+  register: argocd_helmchart
+  changed_when: false
+  check_mode: false
 
-# Every resource the chart creates is labelled with its version, so this
-# waits out both a first install and a version bump.
-- name: Wait for Argo CD to be deployed at chart {{ argocd_chart_version }}
+- name: Bootstrap Argo CD
+  when: argocd_self_app.stdout == ""
+  block:
+    # k3s applies the file (re-checking every 15s), and its bundled
+    # helm-controller runs the chart install. No helm binary or Kubernetes
+    # libraries needed anywhere.
+    - name: Install Argo CD chart {{ argocd_chart_version }}
+      ansible.builtin.template:
+        src: argocd.yaml.j2
+        dest: "{{ argocd_manifests_dir }}/argocd.yaml"
+        mode: "0600"
+
+    # Every resource the chart creates is labelled with its version, so this
+    # waits out both a first install and a version bump.
+    - name: Wait for Argo CD to be deployed at chart {{ argocd_chart_version }}
+      ansible.builtin.command:
+        argv:
+          - k3s
+          - kubectl
+          - --namespace={{ argocd_namespace }}
+          - wait
+          - --for=jsonpath={.metadata.labels.helm\.sh/chart}=argo-cd-{{ argocd_chart_version }}
+          - deployment/argocd-server
+          - --timeout=10s
+      register: argocd_deployed
+      # The deployment only appears once k3s has picked up the file and the
+      # install job has run; image pulls on a Pi take a few minutes.
+      until: argocd_deployed.rc == 0
+      retries: 60
+      delay: 10
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Wait for Argo CD to be ready
+      ansible.builtin.command: k3s kubectl --namespace={{ argocd_namespace }} rollout status {{ item }} --timeout=600s
+      loop:
+        - statefulset/argocd-application-controller
+        - deployment/argocd-server
+        - deployment/argocd-repo-server
+        - deployment/argocd-redis
+        - deployment/argocd-applicationset-controller
+      changed_when: false
+      when: not ansible_check_mode
+
+    # Earlier versions of this role had k3s apply the root app from a file.
+    # Removing the file leaves the Application in place.
+    - name: Remove the old root app manifest
+      ansible.builtin.file:
+        path: "{{ argocd_manifests_dir }}/argocd-root-app.yaml"
+        state: absent
+
+    - name: Apply the root app of apps
+      ansible.builtin.command:
+        cmd: k3s kubectl apply --filename=-
+        stdin: "{{ argocd_root_app | to_json }}"
+      register: argocd_root_applied
+      changed_when: "' unchanged' not in argocd_root_applied.stdout"
+
+    # Have root pick up apps/argocd.yaml now rather than at its next poll.
+    - name: Refresh the root app
+      ansible.builtin.command: >-
+        k3s kubectl --namespace={{ argocd_namespace }} annotate application/{{ argocd_root_app.metadata.name }}
+        argocd.argoproj.io/refresh=normal --overwrite
+      changed_when: false
+      when: not ansible_check_mode
+
+# Healthy means Argo CD has synced the chart over the bootstrap install
+# (same release name, so the same resources) and runs from it.
+- name: Wait for Argo CD to manage itself
   ansible.builtin.command:
     argv:
       - k3s
       - kubectl
       - --namespace={{ argocd_namespace }}
       - wait
-      - --for=jsonpath={.metadata.labels.helm\.sh/chart}=argo-cd-{{ argocd_chart_version }}
-      - deployment/argocd-server
+      - --for=jsonpath={.status.health.status}=Healthy
+      - application/argocd
       - --timeout=10s
-  register: argocd_deployed
-  # The deployment only appears once k3s has picked up the file and the
-  # install job has run; image pulls on a Pi take a few minutes.
-  until: argocd_deployed.rc == 0
+  register: argocd_self_healthy
+  until: argocd_self_healthy.rc == 0
   retries: 60
   delay: 10
   changed_when: false
   when: not ansible_check_mode
 
-- name: Wait for Argo CD to be ready
-  ansible.builtin.command: k3s kubectl --namespace={{ argocd_namespace }} rollout status {{ item }} --timeout=600s
-  loop:
-    - statefulset/argocd-application-controller
-    - deployment/argocd-server
-    - deployment/argocd-repo-server
-    - deployment/argocd-redis
-    - deployment/argocd-applicationset-controller
-  changed_when: false
-  when: not ansible_check_mode
-
-- name: Wait for the root app to sync
+- name: Wait for Argo CD's own app to sync
   ansible.builtin.command:
     argv:
       - k3s
@@ -55,11 +109,41 @@
       - --namespace={{ argocd_namespace }}
       - wait
       - --for=jsonpath={.status.sync.status}=Synced
-      - application/{{ argocd_root_app_name }}
+      - application/argocd
+      - application/{{ argocd_root_app.metadata.name }}
       - --timeout=10s
-  register: argocd_root_synced
-  until: argocd_root_synced.rc == 0
+  register: argocd_synced
+  until: argocd_synced.rc == 0
   retries: 30
   delay: 10
   changed_when: false
   when: not ansible_check_mode
+
+# Deleting a HelmChart makes helm-controller run `helm uninstall`, which
+# would take Argo CD down with it. With the release records gone first,
+# that delete job finds no release and does nothing, so the workloads,
+# now owned by the `argocd` Application, stay. Removing the manifest file
+# keeps k3s from recreating the HelmChart (deleting a file alone doesn't
+# delete what k3s applied from it).
+- name: Hand Argo CD over from helm-controller to itself
+  when: argocd_helmchart.stdout != "" or argocd_self_app.stdout == ""
+  block:
+    - name: Remove the bootstrap HelmChart manifest
+      ansible.builtin.file:
+        path: "{{ argocd_manifests_dir }}/argocd.yaml"
+        state: absent
+
+    - name: Delete the bootstrap Helm release records
+      ansible.builtin.command: k3s kubectl --namespace={{ argocd_namespace }} delete secret --selector=owner=helm,name=argocd
+      register: argocd_release_deleted
+      changed_when: "'deleted' in argocd_release_deleted.stdout"
+
+    - name: Delete the bootstrap HelmChart
+      ansible.builtin.command: k3s kubectl --namespace=kube-system delete helmchart/argocd --ignore-not-found --timeout=300s
+      register: argocd_helmchart_deleted
+      changed_when: "'deleted' in argocd_helmchart_deleted.stdout"
+
+    - name: Check Argo CD survived the handover
+      ansible.builtin.command: k3s kubectl --namespace={{ argocd_namespace }} rollout status deployment/argocd-server --timeout=120s
+      changed_when: false
+      when: not ansible_check_mode

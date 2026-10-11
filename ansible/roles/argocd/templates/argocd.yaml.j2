@@ -1,5 +1,6 @@
-# Managed by Ansible (roles/argocd). k3s applies this file, and its
-# helm-controller installs or upgrades the chart whenever it changes.
+# Managed by Ansible (roles/argocd), for bootstrapping only. k3s applies
+# this file and its helm-controller installs the chart; once the `argocd`
+# Application has taken over, the role deletes both.
 apiVersion: helm.cattle.io/v1
 kind: HelmChart
 metadata:

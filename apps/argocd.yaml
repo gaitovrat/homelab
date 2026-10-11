@@ -1,0 +1,51 @@
+# Argo CD manages itself. The Ansible argocd role reads this file (chart,
+# version, values) to bootstrap a new cluster, then hands over to it.
+# No finalizer: deleting this Application leaves Argo CD running.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: ghcr.io/argoproj/argo-helm
+    chart: argo-cd
+    targetRevision: 10.10.2
+    helm:
+      # Same release name as the bootstrap install, so Argo CD adopts the
+      # resources it already runs instead of creating a second copy.
+      releaseName: argocd
+      # Lean values for a 4 GB node: no Dex (no SSO yet, local admin only),
+      # no notifications controller. Every other component runs a single
+      # replica, without HA Redis.
+      valuesObject:
+        dex:
+          enabled: false
+        notifications:
+          enabled: false
+        controller:
+          replicas: 1
+        server:
+          replicas: 1
+        repoServer:
+          replicas: 1
+        applicationSet:
+          replicas: 1
+        redis-ha:
+          enabled: false
+        configs:
+          cm:
+            # No terminal into pods from the UI.
+            exec.enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      # Argo CD's CRDs are too big for client-side apply's
+      # last-applied-configuration annotation.
+      - ServerSideApply=true
