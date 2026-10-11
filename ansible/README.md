@@ -73,7 +73,7 @@ Per-node overrides (e.g. `ansible_user`, if your SSH user differs from your loca
 | `base` | Base packages; `cgroup_memory=1 cgroup_enable=memory` in `cmdline.txt` (k3s needs the memory cgroup); zram-only swap via rpi-swap (no swap file on the SD card); journald in RAM only, capped at 64M; unattended security upgrades (no auto-reboot). Reboots the node when the cmdline or swap config changes. |
 | `tailscale` | Official apt repo, pinned `tailscale` (Renovate bumps it), `tailscaled` enabled; `tailscale up` with the node's inventory name, skipped once the node is up. |
 | `disks` | Mounts the node's `disks_mounts` at `/mnt/disks/<name>` by filesystem UUID, whenever the disk is plugged in (see [Disks](#disks)); spins USB HDDs down after 10 min idle (`hd-idle`). Never formats anything. |
-| `k3s` | Pinned single-node k3s server (sqlite, Traefik, local-path, metrics-server); API certificate valid for the node's MagicDNS name and tailnet IP; copies the kubeconfig to `~/.kube/<host>.yaml` on the laptop (see [k3s](#k3s)). |
+| `k3s` | Pinned single-node k3s server (sqlite, Traefik, local-path, metrics-server); API certificate valid for the node's MagicDNS name and tailnet IP; merges the cluster into `~/.kube/config` on the laptop as context `homelab` (see [k3s](#k3s)). |
 
 ## Tailscale
 
@@ -152,11 +152,11 @@ One k3s server per node, with the default sqlite datastore and the bundled Traef
 
 - **Version:** `k3s_version` in `roles/k3s/defaults/main.yml`, which also pins the install script to the same tag. Renovate opens a PR when a new k3s release is out; merge it and run `site.yml` to upgrade. k3s never updates itself. Upgrade one minor version at a time: if Renovate's PR skips a minor, edit it down.
 - **API certificate (`tls-san`):** the node's MagicDNS name, plus its tailnet IPv4 read from `tailscale ip -4` at run time, so it's never in this repo. Changing the list restarts k3s.
-- **Kubeconfig:** written to `~/.kube/<host>.yaml` on the machine running Ansible (mode `0600`, never in the repo), pointing at `https://<host>.<tailnet_domain>:6443`, with cluster, user and context named after the node. It holds cluster-admin credentials, so the play never logs or diffs it. On the node, `/etc/rancher/k3s/k3s.yaml` is readable without sudo (`write-kubeconfig-mode: 0644`).
+- **Kubeconfig:** merged into your default `~/.kube/config` on the machine running Ansible, as a cluster, user and context all named `k3s_cluster_name` (`homelab`), pointing at `https://<host>.<tailnet_domain>:6443`. The play replaces only its own `homelab` entries: other clusters' contexts stay, and so does your current context (it's set to `homelab` only if the file had none). The file is kept at `0600`, and each change leaves a timestamped backup next to it (`config.<pid>.<date>~`, also `0600`; delete old ones when you like). It holds cluster-admin credentials, so the play never logs or diffs it. On the node, `/etc/rancher/k3s/k3s.yaml` is readable without sudo (`write-kubeconfig-mode: 0644`).
 
 ```sh
-export KUBECONFIG=~/.kube/k3s-01.yaml   # or merge: KUBECONFIG=~/.kube/config:~/.kube/k3s-01.yaml
-kubectl get nodes
+kubectl config get-contexts
+kubectl config use-context homelab      # or per command: kubectl --context homelab get nodes
 ```
 
 Uninstall (wipes the cluster and its local-path volumes): `ssh k3s-01.tailbc9346.ts.net sudo k3s-uninstall.sh`.
@@ -174,8 +174,7 @@ ssh k3s-01.tailbc9346.ts.net 'findmnt /mnt/disks/hdd1; systemctl is-active hd-id
 # expect the disk mounted from /dev/sdX1; unplug it and findmnt is empty, and
 # `lsattr -d /mnt/disks/hdd1` shows `i` on the bare mountpoint
 
-export KUBECONFIG=~/.kube/k3s-01.yaml
-kubectl get nodes -o wide          # k3s-01 Ready at the pinned version; works from outside home too
-kubectl top nodes                  # metrics-server answers
-kubectl -n kube-system get pods    # coredns, traefik, local-path-provisioner, metrics-server Running
+kubectl --context homelab get nodes -o wide         # k3s-01 Ready at the pinned version; works from outside home too
+kubectl --context homelab top nodes                 # metrics-server answers
+kubectl --context homelab -n kube-system get pods   # coredns, traefik, local-path-provisioner, metrics-server Running
 ```

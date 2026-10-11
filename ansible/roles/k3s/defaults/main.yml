@@ -14,7 +14,10 @@ k3s_tls_san:
 # Readable by the admin user on the node, so `kubectl` there needs no sudo.
 k3s_write_kubeconfig_mode: "0644"
 
-# Where the kubeconfig lands on the machine running Ansible. Never commit it.
-k3s_kubeconfig_dest: "{{ lookup('ansible.builtin.env', 'HOME') }}/.kube/{{ inventory_hostname }}.yaml"
-# What the fetched kubeconfig points kubectl at: the node's MagicDNS name.
+# The cluster is merged into this kubeconfig on the machine running Ansible,
+# as a cluster, user and context all named k3s_cluster_name. Other entries
+# in the file are left alone. Never commit it.
+k3s_kubeconfig_dest: "{{ lookup('ansible.builtin.env', 'HOME') }}/.kube/config"
+k3s_cluster_name: homelab
+# Where that context points kubectl: the server's MagicDNS name.
 k3s_kubeconfig_server: "https://{{ inventory_hostname }}.{{ tailnet_domain }}:6443"

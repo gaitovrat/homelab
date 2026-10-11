@@ -79,18 +79,51 @@
   delegate_to: localhost
   become: false
 
-# Points at the MagicDNS name instead of 127.0.0.1, and names the cluster,
-# user and context after the node instead of "default", so several
-# kubeconfigs can be merged via KUBECONFIG.
-- name: Write kubeconfig on the control machine
+- name: Read local kubeconfig
+  ansible.builtin.slurp:
+    src: "{{ k3s_kubeconfig_dest }}"
+  register: k3s_local_kubeconfig
+  failed_when: false
+  delegate_to: localhost
+  become: false
+  no_log: true
+  when: k3s_kubeconfig is not skipped
+
+# Replaces this cluster's entries (named k3s_cluster_name) and keeps every
+# other cluster, user and context, and the current context. The server
+# address is the MagicDNS name instead of 127.0.0.1. `backup` keeps the
+# previous file next to it (also 0600) whenever it changes.
+- name: Merge cluster into the local kubeconfig
   ansible.builtin.copy:
     dest: "{{ k3s_kubeconfig_dest }}"
     mode: "0600"
-    content: >-
-      {{ k3s_kubeconfig.content | b64decode
-         | regex_replace('https://127\.0\.0\.1:6443', k3s_kubeconfig_server)
-         | regex_replace('(?m)^(\s*(?:- )?(?:name|cluster|user|current-context)): default$',
-                         '\1: ' ~ inventory_hostname) }}
+    backup: true
+    content: "{{ k3s_merged | to_nice_yaml(indent=2) }}"
+  vars:
+    k3s_name: "{{ k3s_cluster_name }}"
+    k3s_node: "{{ k3s_kubeconfig.content | b64decode | from_yaml }}"
+    k3s_local: >-
+      {{ (k3s_local_kubeconfig.content | b64decode | from_yaml
+          if 'content' in k3s_local_kubeconfig else {}) | default({}, true) }}
+    k3s_merged: >-
+      {{ k3s_local | combine({
+           'apiVersion': 'v1',
+           'kind': 'Config',
+           'preferences': k3s_local.preferences | default({}),
+           'clusters': (k3s_local.clusters | default([], true)
+                        | rejectattr('name', 'equalto', k3s_name) | list)
+                       + [{'name': k3s_name,
+                           'cluster': k3s_node.clusters[0].cluster
+                                      | combine({'server': k3s_kubeconfig_server})}],
+           'users': (k3s_local.users | default([], true)
+                     | rejectattr('name', 'equalto', k3s_name) | list)
+                    + [{'name': k3s_name, 'user': k3s_node.users[0].user}],
+           'contexts': (k3s_local.contexts | default([], true)
+                        | rejectattr('name', 'equalto', k3s_name) | list)
+                       + [{'name': k3s_name,
+                           'context': {'cluster': k3s_name, 'user': k3s_name}}],
+           'current-context': k3s_local['current-context'] | default(k3s_name, true),
+         }) }}
   delegate_to: localhost
   become: false
   no_log: true
