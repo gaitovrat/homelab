@@ -1,9 +1,0 @@
----
-# Optional. Copy to local.yml (gitignored) for per-machine settings that
-# shouldn't be in this public repo.
-
-# Domain the nodes are reached under; unset means mDNS on the LAN (.local).
-# homelab_domain: local
-
-# SSH user, if it differs from your local username.
-# ansible_user: CHANGEME

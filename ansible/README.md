@@ -8,7 +8,7 @@ ansible-playbook site.yml          # Touch ID once, for the vault key
 ansible-playbook site.yml --check  # dry run
 ```
 
-Optional per-machine settings (SSH user, domain) go in `inventory/group_vars/all/local.yml`, which is gitignored; see `local.yml.example`.
+Per-node settings go in `inventory/host_vars/<host>/`: plain values in any `.yml` there, and secrets or anything that shouldn't be public in its encrypted `vault.yml` (see below).
 
 ## Secrets: Ansible Vault + 1Password
 
@@ -48,7 +48,9 @@ Keep the key safe: anyone with it and repo access can decrypt every secret here.
 
 ## How nodes are addressed
 
-By name only, never by IP: `ansible_host` is `<inventory_hostname>.<homelab_domain>`, and `homelab_domain` defaults to `local` (mDNS, e.g. `k3s-01.local`, home LAN only). Override for one run with `-e homelab_domain=...`.
+By name only, never by IP. `ansible_host` defaults to `<inventory_hostname>.local` (mDNS, e.g. `k3s-01.local`, home LAN only), set in `group_vars/all/main.yml`. To reach a node another way, set `ansible_host` in its `host_vars/<host>/`, in `vault.yml` if the name shouldn't be public. For one run: `-e ansible_host=...` (with `--limit <host>`).
+
+If your SSH user differs from your local username, set `ansible_user` the same way.
 
 ## Roles
 
