@@ -1,0 +1,64 @@
+---
+- name: Install base packages
+  ansible.builtin.apt:
+    name: "{{ base_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Enable kernel cmdline args
+  ansible.builtin.lineinfile:
+    path: "{{ base_cmdline_path }}"
+    # cmdline.txt is a single line; append the arg only if it's missing.
+    regexp: '^(?!.*(?:^|\s){{ item | regex_escape }}(?:\s|$))(.*?)\s*$'
+    line: '\1 {{ item }}'
+    backrefs: true
+  loop: "{{ base_cmdline_args }}"
+  notify: Reboot
+
+- name: Create drop-in config directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /etc/rpi/swap.conf.d
+    - /etc/systemd/journald.conf.d
+
+- name: Configure swap mechanism
+  ansible.builtin.copy:
+    dest: /etc/rpi/swap.conf.d/50-homelab.conf
+    mode: "0644"
+    content: |
+      [Main]
+      Mechanism={{ base_swap_mechanism }}
+  notify: Reboot
+
+- name: Configure journald
+  ansible.builtin.copy:
+    dest: /etc/systemd/journald.conf.d/50-homelab.conf
+    mode: "0644"
+    content: |
+      [Journal]
+      Storage=volatile
+      RuntimeMaxUse={{ base_journald_runtime_max_use }}
+  notify: Restart journald
+
+- name: Install unattended-upgrades
+  ansible.builtin.apt:
+    name: unattended-upgrades
+    state: present
+
+# Uses the package's default origins (Debian security updates) and never
+# reboots on its own.
+- name: Enable unattended upgrades
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    mode: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+
+# Apply cgroup/swap changes now, before later roles (k3s) rely on them.
+- name: Run pending handlers
+  ansible.builtin.meta: flush_handlers

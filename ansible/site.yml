@@ -1,0 +1,6 @@
+---
+- name: Bootstrap k3s nodes
+  hosts: k3s
+  become: true
+  roles:
+    - base

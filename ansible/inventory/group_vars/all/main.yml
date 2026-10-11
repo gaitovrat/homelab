@@ -1,0 +1,5 @@
+---
+# Nodes are reached by name, never by IP (see decision log): mDNS
+# `<host>.local` on the LAN by default. Override homelab_domain in the
+# gitignored local.yml (see local.yml.example) or with -e.
+ansible_host: "{{ inventory_hostname }}.{{ homelab_domain | default('local') }}"
