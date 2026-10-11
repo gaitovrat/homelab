@@ -1,0 +1,65 @@
+---
+# Both go through k3s's auto-deploy manifests directory: k3s applies each
+# file (re-checking every 15s), and its bundled helm-controller runs the
+# chart install. No helm binary or Kubernetes libraries needed anywhere.
+# Removing a file there deletes what it created.
+- name: Install Argo CD chart {{ argocd_chart_version }}
+  ansible.builtin.template:
+    src: argocd.yaml.j2
+    dest: /var/lib/rancher/k3s/server/manifests/argocd.yaml
+    mode: "0600"
+
+- name: Apply the root app of apps
+  ansible.builtin.template:
+    src: root-app.yaml.j2
+    dest: /var/lib/rancher/k3s/server/manifests/argocd-root-app.yaml
+    mode: "0600"
+
+# Every resource the chart creates is labelled with its version, so this
+# waits out both a first install and a version bump.
+- name: Wait for Argo CD to be deployed at chart {{ argocd_chart_version }}
+  ansible.builtin.command:
+    argv:
+      - k3s
+      - kubectl
+      - --namespace={{ argocd_namespace }}
+      - wait
+      - --for=jsonpath={.metadata.labels.helm\.sh/chart}=argo-cd-{{ argocd_chart_version }}
+      - deployment/argocd-server
+      - --timeout=10s
+  register: argocd_deployed
+  # The deployment only appears once k3s has picked up the file and the
+  # install job has run; image pulls on a Pi take a few minutes.
+  until: argocd_deployed.rc == 0
+  retries: 60
+  delay: 10
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Wait for Argo CD to be ready
+  ansible.builtin.command: k3s kubectl --namespace={{ argocd_namespace }} rollout status {{ item }} --timeout=600s
+  loop:
+    - statefulset/argocd-application-controller
+    - deployment/argocd-server
+    - deployment/argocd-repo-server
+    - deployment/argocd-redis
+    - deployment/argocd-applicationset-controller
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Wait for the root app to sync
+  ansible.builtin.command:
+    argv:
+      - k3s
+      - kubectl
+      - --namespace={{ argocd_namespace }}
+      - wait
+      - --for=jsonpath={.status.sync.status}=Synced
+      - application/{{ argocd_root_app_name }}
+      - --timeout=10s
+  register: argocd_root_synced
+  until: argocd_root_synced.rc == 0
+  retries: 30
+  delay: 10
+  changed_when: false
+  when: not ansible_check_mode

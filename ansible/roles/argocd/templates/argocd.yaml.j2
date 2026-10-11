@@ -1,0 +1,17 @@
+# Managed by Ansible (roles/argocd). k3s applies this file, and its
+# helm-controller installs or upgrades the chart whenever it changes.
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: argocd
+  namespace: kube-system
+spec:
+  chart: {{ argocd_chart }}
+  version: "{{ argocd_chart_version }}"
+  targetNamespace: {{ argocd_namespace }}
+  createNamespace: true
+  # The default (reinstall) uninstalls the release when an upgrade fails.
+  # Keep it instead and retry on the next change.
+  failurePolicy: retry
+  valuesContent: |-
+    {{ argocd_values | to_nice_yaml(indent=2) | indent(4) }}

@@ -1,0 +1,22 @@
+# Managed by Ansible (roles/argocd). k3s applies this file, retrying every
+# 15s until Argo CD's CRDs exist.
+# The root "app of apps": syncs every Application in {{ argocd_root_app_path }}/.
+# No finalizer, so deleting it leaves the child apps and their workloads.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ argocd_root_app_name }}
+  namespace: {{ argocd_namespace }}
+spec:
+  project: default
+  source:
+    repoURL: {{ argocd_root_app_repo }}
+    targetRevision: {{ argocd_root_app_revision }}
+    path: {{ argocd_root_app_path }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ argocd_namespace }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
