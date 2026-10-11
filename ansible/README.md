@@ -12,9 +12,16 @@ Per-node settings go in `inventory/host_vars/<host>/`: plain values in any `.yml
 
 ## Secrets: Ansible Vault + 1Password
 
-Secrets live **in the repo, encrypted** with Ansible Vault (AES-256), one file per node: `inventory/host_vars/<host>/vault.yml`. Right now that's only `ansible_become_password`, the node's sudo password, which differs per node. Ansible loads `host_vars/<inventory_hostname>/` automatically. A `group_vars/all/vault.yml` can hold a shared fallback; host values win. All files use the same key (the *vault password*), which is in 1Password, never in the repo.
+Secrets live **in the repo, encrypted** with Ansible Vault (AES-256). Nothing secret is passed on the command line or through env vars.
 
-`ansible.cfg` sets `vault_password_file = vault-pass.sh`. Ansible runs that script, it prints the key via `op read`, and the vault decrypts with no prompt. The 1Password reference defaults to `op://Private/homelab-ansible-vault/password`; set `ANSIBLE_VAULT_OP_REF` to use another.
+| File | Holds |
+|---|---|
+| `inventory/group_vars/all/vault.yml` | secrets shared by all nodes: `tailscale_authkey` |
+| `inventory/host_vars/<host>/vault.yml` | per-node secrets: `ansible_become_password` (sudo password), and `ansible_host` once the node is on the tailnet |
+
+Ansible loads both automatically; for the same variable, the host's value wins. All files use the same key (the *vault password*), which is in 1Password, never in the repo.
+
+`ansible.cfg` sets `vault_password_file = vault-pass.sh`. Ansible runs that script, it prints the key via `op read`, and the vault decrypts with no prompt. The 1Password reference defaults to `op://Homelab/homelab-ansible-vault/password`; set `ANSIBLE_VAULT_OP_REF` to use another.
 
 ### One-time setup
 
@@ -22,7 +29,7 @@ Secrets live **in the repo, encrypted** with Ansible Vault (AES-256), one file p
 2. Generate the vault key in 1Password:
 
    ```sh
-   op item create --category=password --vault=Private --title=homelab-ansible-vault \
+   op item create --category=password --vault=Homelab --title=homelab-ansible-vault \
      --generate-password='letters,digits,symbols,48'
    ./vault-pass.sh >/dev/null && echo ok   # the script can read it
    ```
@@ -41,7 +48,7 @@ Secrets live **in the repo, encrypted** with Ansible Vault (AES-256), one file p
 ```sh
 ansible-vault view inventory/host_vars/k3s-01/vault.yml    # read
 ansible-vault edit inventory/host_vars/k3s-01/vault.yml    # change (re-encrypts on save)
-ansible-vault rekey inventory/host_vars/*/vault.yml        # after rotating the key in 1Password
+ansible-vault rekey inventory/group_vars/all/vault.yml inventory/host_vars/*/vault.yml   # after rotating the key in 1Password
 ```
 
 Keep the key safe: anyone with it and repo access can decrypt every secret here. Losing it means re-creating the vault files. No 1Password at hand? `ansible-playbook site.yml --ask-vault-pass` prompts for the key instead.
@@ -68,16 +75,22 @@ If your SSH user differs from your local username, set `ansible_user` the same w
 
 ### First run (node not on the tailnet yet)
 
-1. In the [admin console → Settings → Keys](https://login.tailscale.com/admin/settings/keys), generate an auth key: one-off (not reusable), not ephemeral.
-2. Run over the LAN (the node's `ansible_host` is still `<host>.local`), passing the key at run time. The leading space keeps it out of shell history (zsh `setopt HIST_IGNORE_SPACE`, bash `HISTCONTROL=ignorespace`):
+1. In the [admin console → Settings → Keys](https://login.tailscale.com/admin/settings/keys), generate an auth key: **reusable** (one key onboards every node), **not ephemeral**, expiry up to 90 days, pre-approved if device approval is on, no tags.
+2. Put it in the shared vault (creates the file the first time; `edit` afterwards), then commit the encrypted file:
 
    ```sh
-    TAILSCALE_AUTHKEY=tskey-auth-... ansible-playbook site.yml --limit k3s-01
+   ansible-vault create inventory/group_vars/all/vault.yml   # tailscale_authkey: tskey-auth-...
    ```
 
-   `-e tailscale_authkey=...` works too. The key is never logged (`no_log`) and only needed for the first login: later runs see the node is up and skip `tailscale up`.
-3. In the [Machines](https://login.tailscale.com/admin/machines) page, open the node → **Disable key expiry**. Otherwise the node drops off the tailnet when its key expires (180 days by default).
-4. Point Ansible at the tailnet: `ansible-vault edit inventory/host_vars/k3s-01/vault.yml` and add `ansible_host: k3s-01.<tailnet>.ts.net` (tailnet name from the [DNS](https://login.tailscale.com/admin/dns) page). It's in the vault so the tailnet name stays out of this public repo. Later runs, `ssh` and kubectl then go over the tailnet.
+3. Run over the LAN (the node's `ansible_host` is still `<host>.local`):
+
+   ```sh
+   ansible-playbook site.yml --limit k3s-01
+   ```
+
+   The key is never logged (`no_log`) and only used for a node's first login: later runs see the node is up and skip `tailscale up`. When the key expires, nodes already on the tailnet are unaffected; generate a new one and `ansible-vault edit` it in before onboarding the next node. You can also revoke it in the console once all nodes have joined.
+4. In the [Machines](https://login.tailscale.com/admin/machines) page, open the node → **Disable key expiry**. Otherwise the node drops off the tailnet when its key expires (180 days by default).
+5. Point Ansible at the tailnet: `ansible-vault edit inventory/host_vars/k3s-01/vault.yml` and add `ansible_host: k3s-01.<tailnet>.ts.net` (tailnet name from the [DNS](https://login.tailscale.com/admin/dns) page). It's in the vault so the tailnet name stays out of this public repo. Later runs, `ssh` and kubectl then go over the tailnet.
 
 The node runs with `--accept-dns=false`: it never needs to resolve tailnet names, and this keeps its DNS (and so k3s CoreDNS) independent of `tailscaled`.
 

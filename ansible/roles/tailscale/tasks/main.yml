@@ -56,8 +56,8 @@
   ansible.builtin.assert:
     that: tailscale_authkey | length > 0
     fail_msg: >-
-      {{ inventory_hostname }} is not logged in to Tailscale. Pass an auth key with
-      -e tailscale_authkey=tskey-auth-... or the TAILSCALE_AUTHKEY env var.
+      {{ inventory_hostname }} is not logged in to Tailscale. Set tailscale_authkey
+      in inventory/group_vars/all/vault.yml (ansible-vault edit).
     quiet: true
   when: tailscale_backend_state == 'NeedsLogin' and not ansible_check_mode
 
