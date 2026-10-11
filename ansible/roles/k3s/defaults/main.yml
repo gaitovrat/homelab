@@ -1,7 +1,7 @@
 ---
 # Also pins the install script (fetched from the same tag).
 # renovate: datasource=github-releases depName=k3s-io/k3s versioning=regex:^v(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)\+k3s(?<build>\d+)$
-k3s_version: "v1.36.5+k3s1"
+k3s_version: "v1.37.1+k3s1"
 
 k3s_install_script_url: "https://raw.githubusercontent.com/k3s-io/k3s/{{ k3s_version }}/install.sh"
 
