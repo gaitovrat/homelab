@@ -1,0 +1,9 @@
+---
+# 1 TB USB HDD. exFAT so it stays readable on macOS/Windows when unplugged.
+# exFAT has no Unix owners: every file appears as uid/gid 1000 (the admin
+# user), so pods that write here must run as 1000 too.
+disks_mounts:
+  - name: hdd1
+    uuid: 0C5F-09C7
+    fstype: exfat
+    options: noatime,uid=1000,gid=1000,fmask=0022,dmask=0022

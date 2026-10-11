@@ -72,6 +72,7 @@ Per-node overrides (e.g. `ansible_user`, if your SSH user differs from your loca
 |---|---|
 | `base` | Base packages; `cgroup_memory=1 cgroup_enable=memory` in `cmdline.txt` (k3s needs the memory cgroup); zram-only swap via rpi-swap (no swap file on the SD card); journald in RAM only, capped at 64M; unattended security upgrades (no auto-reboot). Reboots the node when the cmdline or swap config changes. |
 | `tailscale` | Official apt repo, pinned `tailscale` (Renovate bumps it), `tailscaled` enabled; `tailscale up` with the node's inventory name, skipped once the node is up. |
+| `disks` | Mounts the node's `disks_mounts` at `/mnt/disks/<name>` by filesystem UUID, whenever the disk is plugged in (see [Disks](#disks)); spins USB HDDs down after 10 min idle (`hd-idle`). Never formats anything. |
 
 ## Tailscale
 
@@ -97,6 +98,53 @@ Per-node overrides (e.g. `ansible_user`, if your SSH user differs from your loca
 
 The node runs with `--accept-dns=false`: it never needs to resolve tailnet names, and this keeps its DNS (and so k3s CoreDNS) independent of `tailscaled`.
 
+## Disks
+
+Each data disk is listed per node in `inventory/host_vars/<host>/main.yml`:
+
+```yaml
+disks_mounts:
+  - name: hdd1                  # mounted at /mnt/disks/hdd1
+    uuid: 0C5F-09C7             # filesystem UUID, from `lsblk -f`
+    fstype: exfat               # default ext4
+    options: noatime,uid=1000,gid=1000,fmask=0022,dmask=0022   # default noatime
+```
+
+A filesystem UUID is not a secret, so it lives in plain text. It changes only when the disk is reformatted.
+
+### ext4 or exFAT
+
+k3s-01's HDD is **exFAT**, so it can be unplugged and read on macOS or Windows as is. That's fine for plain files (FileBrowser, backups), with these trade-offs:
+
+- **No Unix owners or permissions.** Every file shows the `uid`/`gid` and masks from the mount options (here 1000, the admin user, `rwxr-xr-x`). Pods that write to the disk must run as uid 1000; `chown`/`chmod` inside it fail or do nothing.
+- **No journal.** A disk pulled out mid-write can be left inconsistent. The role installs `exfatprogs`, so `fsck.exfat` repairs it automatically next time it's mounted. Still, prefer `sudo systemctl stop mnt-disks-hdd1.mount` before unplugging.
+- **No symlinks, hard links or special files.** So no k8s PVs for databases, and no `rsync -aHAX` onto it.
+
+Use ext4 for a disk that only the Pi uses, or that needs any of the above.
+
+### Unplugged or replaced disks
+
+A data disk can be missing at any time, and nothing depends on it being there:
+
+- **Not plugged in at boot:** boot doesn't wait for it. The disk gets a systemd mount unit (`mnt-disks-<name>.mount`) that nothing enables. A udev rule (`/etc/udev/rules.d/90-homelab-disks.rules`) starts that unit when a filesystem with its UUID appears, at boot or hot-plugged later. Ansible prints a warning and carries on.
+- **Unplugged while running:** systemd unmounts it (the mount unit stops when its device goes away), so there's no stale mount. Plug it back in and it's fsck'd and mounted again.
+- **Empty mountpoint:** while no disk is mounted, `/mnt/disks/<name>` is an empty, immutable (`chattr +i`) directory on the SD card. Writes there fail instead of quietly filling the SD card.
+- **Spindown:** `hd-idle` applies to every `sd*` disk, not to one device name, so it covers a replacement disk with no changes.
+
+Pods that use a disk through `hostPath` should set `mountPropagation: HostToContainer`. Without it, a pod keeps the mount it started with, and only a pod restart picks up a disk that was re-plugged.
+
+To **add or replace** a disk, plug it into the Pi and read its UUID with `ssh k3s-01.tailbc9346.ts.net lsblk -f`. A disk already formatted exFAT (e.g. on a Mac, with Disk Utility → Erase → ExFAT, GUID scheme) needs nothing else. To format it on the Pi instead (this wipes it):
+
+```sh
+ssh k3s-01.tailbc9346.ts.net
+lsblk -f                                                 # find the new disk, e.g. /dev/sdb; check it's the right one
+echo 'type=linux' | sudo sfdisk --label gpt /dev/sdb     # one partition, whole disk
+sudo mkfs.exfat -L Backup /dev/sdb1                      # or: sudo mkfs.ext4 -L hdd1 -m 0 /dev/sdb1
+lsblk -f /dev/sdb                                        # copy the UUID
+```
+
+Put the UUID (and `fstype`/`options`) into `host_vars/<host>/main.yml` and run `ansible-playbook site.yml`. When an entry's UUID changes, the mount unit is restarted, so the new disk replaces the old one at the same path. Copy data over first if the old disk still works: mount the new disk somewhere temporary and `rsync -rt /mnt/disks/hdd1/ /mnt/new/` (`-rt`, since exFAT can't hold owners or links). Removing an entry from `disks_mounts` doesn't clean up its unit or mountpoint on the node; do that by hand.
+
 ## Check
 
 ```sh
@@ -105,4 +153,8 @@ ssh k3s-01.tailbc9346.ts.net 'cat /sys/fs/cgroup/cgroup.controllers; cat /proc/s
 # expect "memory" in the controllers, only /dev/zram0 as swap, and no /var/swap
 
 tailscale status                               # k3s-01 listed, online
+
+ssh k3s-01.tailbc9346.ts.net 'findmnt /mnt/disks/hdd1; systemctl is-active hd-idle'
+# expect the disk mounted from /dev/sdX1; unplug it and findmnt is empty, and
+# `lsattr -d /mnt/disks/hdd1` shows `i` on the bare mountpoint
 ```
