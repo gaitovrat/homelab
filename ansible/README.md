@@ -4,23 +4,46 @@ Bootstraps the k3s nodes. Run everything from this directory so `ansible.cfg` is
 
 ```sh
 cd ansible
-ansible-playbook site.yml -K          # -K prompts for the sudo password (BECOME password)
-ansible-playbook site.yml -K --check  # dry run
+ansible-playbook site.yml          # Touch ID once, for the vault key
+ansible-playbook site.yml --check  # dry run
 ```
 
-Optional per-machine settings (SSH user, domain, sudo password source) go in `inventory/group_vars/all/local.yml`, which is gitignored; see `local.yml.example`.
+Optional per-machine settings (SSH user, domain) go in `inventory/group_vars/all/local.yml`, which is gitignored; see `local.yml.example`.
 
-## sudo password
+## Secrets: Ansible Vault + 1Password
 
-sudo on the nodes asks for a password. Either:
+Secrets live **in the repo, encrypted** with Ansible Vault (AES-256) in `inventory/group_vars/all/vault.yml`. Right now that's only `ansible_become_password`, the sudo password, the same on every node. The key that decrypts the file (the *vault password*) is in 1Password, never in the repo.
 
-- pass `-K` and type it each run, or
-- let Ansible read it from 1Password, then drop `-K`:
-  1. Install the CLI (`brew install 1password-cli`) and turn on 1Password → Settings → Developer → **Integrate with 1Password CLI**, so `op` unlocks through the app with Touch ID.
-  2. In `local.yml`, set `ansible_become_password` to an `op read` lookup (commented example in `local.yml.example`). Get the `op://vault/item/field` path from the item's **Copy Secret Reference**.
-  3. Check: `op read "op://…"` prints the password.
+`ansible.cfg` sets `vault_password_file = vault-pass.sh`. Ansible runs that script, it prints the key via `op read`, and the vault decrypts with no prompt. The 1Password reference defaults to `op://Private/homelab-ansible-vault/password`; set `ANSIBLE_VAULT_OP_REF` to use another.
 
-  The lookup runs `op read` on your machine whenever a task needs sudo; Touch ID is asked once per 1Password session. While it's set, `-K` is ignored (inventory variables beat command-line options); comment it out to go back to typing the password.
+### One-time setup
+
+1. Install the CLI (`brew install 1password-cli`) and turn on 1Password → Settings → Developer → **Integrate with 1Password CLI**, so `op` unlocks through the app with Touch ID.
+2. Generate the vault key in 1Password:
+
+   ```sh
+   op item create --category=password --vault=Private --title=homelab-ansible-vault \
+     --generate-password='letters,digits,symbols,48'
+   ./vault-pass.sh >/dev/null && echo ok   # the script can read it
+   ```
+
+3. Create the encrypted file (opens `$EDITOR`; write `ansible_become_password: <sudo password>`, save, quit):
+
+   ```sh
+   ansible-vault create inventory/group_vars/all/vault.yml
+   ```
+
+   Commit `vault.yml`: it's encrypted (`$ANSIBLE_VAULT;1.1;AES256` header), so it's safe in this public repo.
+
+### Day to day
+
+```sh
+ansible-vault view inventory/group_vars/all/vault.yml   # read
+ansible-vault edit inventory/group_vars/all/vault.yml   # change (re-encrypts on save)
+ansible-vault rekey inventory/group_vars/all/vault.yml  # after rotating the key in 1Password
+```
+
+Keep the key safe: anyone with it and repo access can decrypt every secret here. Losing it means re-creating `vault.yml`. No 1Password at hand? `ansible-playbook site.yml --ask-vault-pass` prompts for the key instead.
 
 ## How nodes are addressed
 
@@ -35,7 +58,7 @@ By name only, never by IP: `ansible_host` is `<inventory_hostname>.<homelab_doma
 ## Check
 
 ```sh
-ansible-playbook site.yml -K                   # second run: changed=0
+ansible-playbook site.yml                      # second run: changed=0
 ssh k3s-01.local 'cat /sys/fs/cgroup/cgroup.controllers; cat /proc/swaps; ls /var/swap'
 # expect "memory" in the controllers, only /dev/zram0 as swap, and no /var/swap
 ```
