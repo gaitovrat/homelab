@@ -1,0 +1,11 @@
+---
+galaxy_info:
+  role_name: tailscale
+  author: gaitovrat
+  description: Install a pinned Tailscale from the official apt repo and enable tailscaled
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions: [bookworm, trixie]
+dependencies: []
