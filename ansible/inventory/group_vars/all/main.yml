@@ -1,7 +1,7 @@
 ---
 # Nodes are reached by name, never by IP (see decision log), and only over
 # Tailscale: their MagicDNS name `<host>.<tailnet_domain>`.
-# A new node isn't on the tailnet yet; bootstrap it once over the LAN with
-# `-e ansible_host=<host>.local --limit <host>` (see README).
+# A new node isn't on the tailnet yet: bootstrap.yml reaches it over the LAN
+# (`<host>.local`) and joins it first (see README).
 tailnet_domain: tailbc9346.ts.net
 ansible_host: "{{ inventory_hostname }}.{{ tailnet_domain }}"

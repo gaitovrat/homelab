@@ -1,0 +1,13 @@
+---
+# First run for a new node: reach it over the LAN (mDNS) and join it to the
+# tailnet. After this, site.yml manages it over Tailscale like every node.
+#   ansible-playbook bootstrap.yml --limit <host>
+- name: Join new nodes to the tailnet
+  hosts: k3s
+  become: true
+  vars:
+    # Play vars beat inventory, so this overrides the MagicDNS ansible_host
+    # from group_vars for this playbook only.
+    ansible_host: "{{ inventory_hostname }}.local"
+  roles:
+    - tailscale

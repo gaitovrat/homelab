@@ -1,5 +1,6 @@
 ---
-- name: Bootstrap k3s nodes
+# Everything, over Tailscale. New nodes run bootstrap.yml first.
+- name: Configure k3s nodes
   hosts: k3s
   become: true
   roles:
