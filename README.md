@@ -18,6 +18,7 @@ GitOps repository for a single-node Raspberry Pi 4 homelab.
 ```
 ansible/              inventory, site.yml, roles (base, disks, k3s, argocd)
 apps/                 Argo CD Applications, one per component
+manifests/            plain manifests and SealedSecrets for apps without a chart
 terraform/cloudflare/ DNS, tunnel, Access
 .github/workflows/    lint and Terraform plan/apply
 ```

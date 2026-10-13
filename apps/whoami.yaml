@@ -1,0 +1,22 @@
+# Test app for the tunnel: https://test.gaitovrat.dev echoes the request it
+# gets (headers, client IP) through Cloudflare → cloudflared → Traefik.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: whoami
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/gaitovrat/homelab.git
+    targetRevision: main
+    path: manifests/whoami
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: whoami
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
