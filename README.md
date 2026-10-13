@@ -24,7 +24,7 @@ terraform/cloudflare/ DNS, tunnel, Access
 
 ## Tools
 
-Every CLI this repo needs (Ansible and ansible-lint, kubectl, kubectx and kubens, helm, kubeseal, jq, gh, actionlint, shellcheck) comes from the Nix dev shell in [`flake.nix`](flake.nix), pinned by `flake.lock`, the same on macOS, Linux and WSL. Ansible and ansible-lint are installed into `.venv` from [`.github/requirements-lint.txt`](.github/requirements-lint.txt), so local runs use the versions CI lints with. Renovate bumps both files.
+Every CLI this repo needs (Ansible and ansible-lint, kubectl, kubectx and kubens, helm, kubeseal, jq, OpenTofu, gh, actionlint, shellcheck) comes from the Nix dev shell in [`flake.nix`](flake.nix), pinned by `flake.lock`, the same on macOS, Linux and WSL. Ansible and ansible-lint are installed into `.venv` from [`.github/requirements-lint.txt`](.github/requirements-lint.txt), so local runs use the versions CI lints with. Renovate bumps both files.
 
 One-time setup per machine:
 

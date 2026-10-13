@@ -31,6 +31,9 @@
               kubectx # also provides kubens
               jq
 
+              # Cloudflare (terraform/cloudflare)
+              opentofu
+
               # Repo and CI
               git
               gh
