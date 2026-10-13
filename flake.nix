@@ -63,6 +63,14 @@
             fi
             export VIRTUAL_ENV="$PWD/.venv"
             export PATH="$VIRTUAL_ENV/bin:$PATH"
+
+            # Ansible, ssh and kubectl reach the nodes over Tailscale. tailscaled is a system
+            # daemon, so it can't come from this shell; install it per machine (see README).
+            if ! command -v tailscale >/dev/null; then
+              echo "homelab: tailscale not installed; nodes are only reachable over the tailnet (see README, Tools)" >&2
+            elif ! tailscale status >/dev/null 2>&1; then
+              echo "homelab: tailscale is not connected; run 'sudo tailscale up' (Linux/WSL) or open the app (macOS)" >&2
+            fi
           '';
         };
       });
