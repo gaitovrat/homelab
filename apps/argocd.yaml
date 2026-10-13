@@ -50,6 +50,23 @@ spec:
           cm:
             # No terminal into pods from the UI.
             exec.enabled: false
+            # SSO through Cloudflare Access as the OIDC provider (no Dex):
+            # the Access SaaS app "Argo CD SSO" in terraform/cloudflare, which
+            # only you can sign in to (GitHub). The client secret is the
+            # SealedSecret in manifests/argocd-oidc.
+            oidc.config: |
+              name: Cloudflare Access
+              issuer: https://gaitovrat.cloudflareaccess.com/cdn-cgi/access/sso/oidc/24444ed1344369422f729358433b248d6279588842bdae70418f77a88626ed83
+              clientID: 24444ed1344369422f729358433b248d6279588842bdae70418f77a88626ed83
+              clientSecret: $argocd-oidc-cloudflare:clientSecret
+              requestedScopes: [openid, email, profile]
+          rbac:
+            # Nobody gets anything by default. Your Access user ID (the
+            # token's `sub`, opaque, so no email in this public repo) is
+            # admin.
+            policy.default: ""
+            policy.csv: |
+              g, 71fc5e5c-1a5f-5bd9-94e1-5b2536589327, role:admin
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd

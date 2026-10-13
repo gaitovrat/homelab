@@ -1,0 +1,14 @@
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: argocd-oidc-cloudflare
+  namespace: argocd
+spec:
+  encryptedData:
+    clientSecret: AgDM9KMuHM/hXXIYZ+oGtt16JnZWqQCIQkB0GIlkpGKCZONMGAKtt0FsFRFNqwFmpt+AyBZViwIaTKogYUxvc2HWI2bCND8tXbRuH9Kbvg8kmgyeX2k4lX3tdJWvN8Xt8h8taDIkExtC8cKOGJ8i/omH1jsSFpMD4Li5jddB6jDYhjqp/MYHDEj+HyDr6+WseBVygwiQjJN29vYsgRKp/KHdSmSXhIvJNUXvEVVdKCUUQCZ6pDZJC9Uowmt0OswO52RT2VrL/LnWpa0Vz/18SSxjJToiw4skRbOD9vFZdJt7aoNDFfB7qJfqSTsXwoxUW4wxv9+FXhSLoEBghC4MJbxCilc9G3TzimaNwEQJLAYM4Z+IVXWCaaZVNQ0islywKJEswR6RmFuWAKL362BWEFwE3NP8zl/O39HfXvZN6SDg0V7+Z14hY69SXZrz1AteUrHZxtAwCc4MnFPn6bWRpWd1Wudt7J3M1RZug8H7WTzXMnRyHF6CkhekV2G1In2stBsOaik5JEvUaRxcp2o7P8SDZE5Pp5wJtm/b/EQXUaDj+gELNg6+G4uGGHmMYae+likA0QmlJg9AsilzByxjbedlrl5h5o0WiGLy+NBNrKsvy8nhxndF43oyP4kYUGxIrT/Qb3mMcCk8gUO2qguEjFm+MoYe2GOPD5JIitSPLOdT8hlJbR+VuS3LuU+pKxEbCT4wqHjQiV59C4ARwR2lGpiJ6oaWYp1tMYr8zM710Q0v2MUvDz/mX8t/DaUmhCz/IBdQTGbOEsPvCefjMT5Orhh+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: argocd
+      name: argocd-oidc-cloudflare
+      namespace: argocd
