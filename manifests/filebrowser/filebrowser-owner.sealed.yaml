@@ -1,0 +1,12 @@
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: filebrowser-owner
+  namespace: filebrowser
+spec:
+  encryptedData:
+    email: AgDGoIYbSC4Gi9Gf5//77OTnH31nvh+POwWM0rg+iZa13ZuibgJY50lYYO1uJJcM5UQwlVKEgU9zJqIoHNKjqIkHcUQWzYwmMOaHwQOx8Yzgxvhclq2ZzBe9e2JuiJdregiD2byTM3hZ61BMlS72uHqL3wQeivFhcjN5d8KujT4JhN9/PVfunnsUQAG4+IYR3Hr8d25bxenYRmVcF/8FVuTrp/dVKUyKKFwyTsVcxWKg2Iwox3x9GzkaFque3yMqhBTQFlRfDOHt9DupQ/lFO5gwiliQBDK0JAPCY8IqL1oX3Rt+5Mpv9ZlIBKeKbxiARTg3+Dy/hTSvd2dV42xeQrx1Ybv4/FaYRMMt0h10ONntIAYImgUWavu1RDNPUDbe/BnR6JrmTLjdSvcIbqXhNbxBb2CiMOn33yBds5pb/9TXUYybbi1Rlcz+SXhPO8IgGege+8wPLGcUqkkE2DnI29o62ozkYOBO8vtumRxlhRbljfacMG/s9LET3dQdEJC5C4m3/GzQgJFaBuPU+CyPBuSup91wW+Al7Y5inw25SsHJmH3RGo+uVQUiIHOR6aPT0DqNN7KVzG3JAn+v3g1esZHRfKy128EwNe7mF73v3vk1xmGSSjcdgsFWETVkvFpMFrVL8ClxocMViSRwTT8XkpV32KIBobxi09PtLoZZS6oxjT0N1iDPUwuYbcNlZ4aC8n6WNaZU4rPjdT/rfBR804DbAfvX
+  template:
+    metadata:
+      name: filebrowser-owner
+      namespace: filebrowser

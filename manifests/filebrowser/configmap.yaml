@@ -1,0 +1,48 @@
+# FileBrowser Quantum config. __OWNER_EMAIL__ is filled in at pod start from
+# the filebrowser-owner SealedSecret (this repo is public).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: filebrowser-config
+data:
+  config.yaml: |
+    server:
+      disableUpdateCheck: true # Renovate bumps the image
+      cacheDir: /home/filebrowser/data/cache
+      sources:
+        - path: /srv/hdd1
+          name: hdd1
+          config:
+            defaultEnabled: true
+            # Everyone who can sign in gets the whole disk.
+            defaultPermissions:
+              view: true
+              download: true
+              modify: true
+              delete: true
+              create: true
+              configured: true
+    http:
+      port: 8080
+      externalUrl: https://files.gaitovrat.dev
+      trustProxyHeaders: true
+    auth:
+      # Cloudflare Access signs everyone in (terraform/cloudflare/access.tf)
+      # and passes the email; FileBrowser takes it as the username. The
+      # owner's email is adminUsername, so that account is admin on every
+      # login. Security: the header is trusted blindly, so anyone who reaches
+      # Traefik without Access (the home LAN) can forge it.
+      adminUsername: __OWNER_EMAIL__
+      methods:
+        proxy:
+          enabled: true
+          header: Cf-Access-Authenticated-User-Email
+        # No passwords, and so no default admin/admin account.
+        password:
+          enabled: false
+    userDefaults:
+      account:
+        loginMethod: proxy
+        permissions:
+          share: true
+          realtime: true

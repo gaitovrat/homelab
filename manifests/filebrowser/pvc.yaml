@@ -1,0 +1,12 @@
+# Database, search index and thumbnail cache (on the SD card via local-path;
+# the files themselves stay on the HDD).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: filebrowser-data
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi

@@ -1,0 +1,22 @@
+# FileBrowser Quantum: browse, upload and share files on the USB HDD at
+# https://files.gaitovrat.dev, behind Cloudflare Access.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: filebrowser
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/gaitovrat/homelab.git
+    targetRevision: main
+    path: manifests/filebrowser
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: filebrowser
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
