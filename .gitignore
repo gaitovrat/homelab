@@ -4,3 +4,9 @@
 
 # Dev shell kubeconfig (cluster-admin credentials, written by the k3s role)
 .kube/
+
+# OpenTofu / Terraform: provider cache, local state and plans (state lives in R2)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
