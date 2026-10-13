@@ -29,6 +29,7 @@
               kubernetes-helm
               kubeseal
               kubectx # also provides kubens
+              argocd
               jq
 
               # Cloudflare (terraform/cloudflare)

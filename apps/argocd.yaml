@@ -20,6 +20,10 @@ spec:
       # no notifications controller. Every other component runs a single
       # replica, without HA Redis.
       valuesObject:
+        # Public URL (Cloudflare Tunnel + Access, see terraform/cloudflare).
+        # The chart derives the Ingress host and Argo CD's `url` from it.
+        global:
+          domain: argocd.gaitovrat.dev
         dex:
           enabled: false
         notifications:
@@ -28,6 +32,10 @@ spec:
           replicas: 1
         server:
           replicas: 1
+          # Cloudflare → tunnel → Traefik (plain HTTP) → argocd-server.
+          ingress:
+            enabled: true
+            ingressClassName: traefik
         repoServer:
           replicas: 1
         applicationSet:
@@ -35,6 +43,10 @@ spec:
         redis-ha:
           enabled: false
         configs:
+          params:
+            # TLS ends at Cloudflare; the tunnel and Traefik speak HTTP,
+            # so the server must not redirect to HTTPS itself.
+            server.insecure: true
           cm:
             # No terminal into pods from the UI.
             exec.enabled: false
