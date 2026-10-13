@@ -24,14 +24,15 @@ terraform/cloudflare/ DNS, tunnel, Access
 
 ## Tools
 
-Every CLI this repo needs (Ansible and ansible-lint, kubectl, helm, kubeseal, jq, gh, actionlint, shellcheck) comes from the Nix dev shell in [`flake.nix`](flake.nix), pinned by `flake.lock`, the same on macOS, Linux and WSL. Ansible and ansible-lint are installed into `.venv` from [`.github/requirements-lint.txt`](.github/requirements-lint.txt), so local runs use the versions CI lints with. Renovate bumps both files.
+Every CLI this repo needs (Ansible and ansible-lint, kubectl, kubectx and kubens, helm, kubeseal, jq, gh, actionlint, shellcheck) comes from the Nix dev shell in [`flake.nix`](flake.nix), pinned by `flake.lock`, the same on macOS, Linux and WSL. Ansible and ansible-lint are installed into `.venv` from [`.github/requirements-lint.txt`](.github/requirements-lint.txt), so local runs use the versions CI lints with. Renovate bumps both files.
 
 One-time setup per machine:
 
 1. Install Nix with flakes on: `curl -fsSL https://install.determinate.systems/nix | sh -s -- install` (on WSL, enable systemd first: `[boot] systemd=true` in `/etc/wsl.conf`, then `wsl --shutdown`).
 2. Install Tailscale and log in to the tailnet. `site.yml`, `ssh` and kubectl reach the nodes only by their MagicDNS names. Tailscale runs as a system daemon (`tailscaled`), so it can't come from the dev shell, which warns when it's missing:
    - macOS: the [Tailscale app](https://tailscale.com/download/mac), with its CLI on `PATH` (app settings → CLI integration) so the dev shell can check it.
-   - Linux and WSL: `curl -fsSL https://tailscale.com/install.sh | sh`, then `sudo tailscale up`. On WSL this installs Tailscale inside the distro and needs systemd (see step 1). WSL then shows up as a machine of its own in the admin console.
+   - Linux: `curl -fsSL https://tailscale.com/install.sh | sh`, then `sudo tailscale up`.
+   - WSL: the [Tailscale app on Windows](https://tailscale.com/download/windows), not inside the distro, because ssh runs on Windows (see step 3). WSL's traffic goes out through Windows, so kubectl in WSL uses the same connection.
 3. Install the 1Password app and its CLI (`op`), and turn on app → Settings → Developer → **Integrate with 1Password CLI**. The CLI has to be installed next to the app to unlock through it, so it can't come from the dev shell. The Ansible vault key and the Sealed Secrets key backup live there; see [`ansible/README.md`](ansible/README.md#one-time-setup).
 4. Optional, to enter the shell on `cd`: install [direnv](https://direnv.net), then `direnv allow` in the repo. `.envrc` loads a pinned [nix-direnv](https://github.com/nix-community/nix-direnv) unless a recent enough one is installed already, which caches the shell so `cd` is instant.
 
@@ -65,10 +66,10 @@ The private key is a Secret in `kube-system` labelled `sealedsecrets.bitnami.com
 kubectl --context homelab -n kube-system get secret -l sealedsecrets.bitnami.com/sealed-secrets-key -o json \
   | jq '{apiVersion: "v1", kind: "List", items: [.items[] | {apiVersion, kind, type, data,
          metadata: {name: .metadata.name, namespace: .metadata.namespace, labels: .metadata.labels}}]}' \
-  | op document create - --vault Homelab --title homelab-sealed-secrets-key --file-name sealed-secrets-key.json
+  | op document create - --vault <vault> --title <item> --file-name sealed-secrets-key.json
 ```
 
-`jq` keeps only what a restore needs (no `uid` or `resourceVersion`, which a new cluster would reject). The key never touches the disk. If the controller ever gets a new key (a key secret was deleted, or `keyrenewperiod` changed), replace the backup: same pipeline, ending in `op document edit homelab-sealed-secrets-key - --vault Homelab`.
+`jq` keeps only what a restore needs (no `uid` or `resourceVersion`, which a new cluster would reject). The key never touches the disk. If the controller ever gets a new key (a key secret was deleted, or `keyrenewperiod` changed), replace the backup: same pipeline, ending in `op document edit <item> - --vault <vault>`.
 
 ### Restoring the key
 
@@ -76,7 +77,7 @@ On a rebuilt cluster, Argo CD deploys the controller, which generates a fresh ke
 
 ```sh
 kubectl --context homelab -n kube-system delete secret -l sealedsecrets.bitnami.com/sealed-secrets-key
-op document get homelab-sealed-secrets-key --vault Homelab | kubectl --context homelab apply -f -
+op document get <item> --vault <vault> | kubectl --context homelab apply -f -
 kubectl --context homelab -n kube-system rollout restart deployment sealed-secrets-controller
 ```
 
