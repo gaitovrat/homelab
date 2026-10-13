@@ -98,3 +98,31 @@ resource "cloudflare_zero_trust_access_application" "this" {
     ) : { id = id, precedence = i + 1 }
   ]
 }
+
+data "cloudflare_zero_trust_organization" "this" {
+  account_id = local.account_id
+}
+
+# Argo CD SSO: Access acts as an OIDC provider for Argo CD (no Dex). Only the
+# owner policy is attached, so only you can get a token; Argo CD maps your
+# Access user ID to admin (apps/argocd.yaml). The client secret is sealed into
+# manifests/argocd-oidc (see README).
+resource "cloudflare_zero_trust_access_application" "argocd_oidc" {
+  account_id       = local.account_id
+  name             = "Argo CD SSO"
+  type             = "saas"
+  session_duration = "24h"
+
+  allowed_idps              = [cloudflare_zero_trust_access_identity_provider.github.id]
+  auto_redirect_to_identity = true
+  app_launcher_visible      = false
+
+  saas_app = {
+    auth_type     = "oidc"
+    redirect_uris = ["https://argocd.${var.zone_name}/auth/callback"]
+    grant_types   = ["authorization_code"]
+    scopes        = ["openid", "email", "profile"]
+  }
+
+  policies = [{ id = cloudflare_zero_trust_access_policy.owner.id, precedence = 1 }]
+}
