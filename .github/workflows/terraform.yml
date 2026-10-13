@@ -1,0 +1,97 @@
+---
+name: terraform
+
+# terraform/cloudflare: plan on PRs (summary as a PR comment), apply on merge to main
+# behind the `cloudflare` environment, which needs an approval.
+on:
+  pull_request:
+    paths:
+      - terraform/**
+      - .github/workflows/terraform.yml
+  push:
+    branches: [main]
+    paths:
+      - terraform/**
+      - .github/workflows/terraform.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run per ref; applies on main queue up instead of cancelling each other.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  # renovate: datasource=github-releases depName=opentofu/opentofu extractVersion=^v(?<version>.+)$
+  TOFU_VERSION: 1.13.1
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  # Same names as terraform/cloudflare/.envrc. The repo is public: the plan never prints
+  # these (Actions masks secrets in logs), and the PR comment carries no values at all.
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_ENDPOINT_URL_S3: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+
+defaults:
+  run:
+    working-directory: terraform/cloudflare
+
+jobs:
+  plan:
+    # Fork PRs get no secrets, so there is nothing to plan with.
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tofu_wrapper: false
+      - run: tofu fmt -check -diff
+      - run: tofu init -lockfile=readonly
+      - run: tofu validate
+      - run: tofu plan -lock-timeout=5m -out=tfplan
+      - name: Summarize plan
+        run: |
+          tofu show -json tfplan | jq -r -f ../../.github/tofu-plan-summary.jq > summary.md
+          cat summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Comment on PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          # Update the earlier plan comment instead of adding one per push.
+          marker='<!-- tofu-plan:terraform/cloudflare -->'
+          body="$(printf '%s\n\n%s\n\n[Full plan in the run log](%s)\n' "$marker" "$(cat summary.md)" \
+            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")"
+          id="$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | head -n1)"
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -f body="$body" >/dev/null
+          else
+            gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -f body="$body" >/dev/null
+          fi
+
+  apply:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: cloudflare
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tofu_wrapper: false
+      - run: tofu init -lockfile=readonly
+      - run: tofu plan -lock-timeout=5m -out=tfplan
+      - name: Summarize plan
+        run: tofu show -json tfplan | jq -r -f ../../.github/tofu-plan-summary.jq >> "$GITHUB_STEP_SUMMARY"
+      - run: tofu apply -lock-timeout=5m tfplan
