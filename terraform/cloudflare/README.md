@@ -35,7 +35,7 @@ Cloudflare Access ([`access.tf`](access.tf)) puts a login in front of `argocd`, 
 The emails and the GitHub App credentials are sensitive variables, kept out of this public repo. One-time setup:
 
 1. **GitHub App** (sign-in only, no installation needed): GitHub → Settings → Developer settings → GitHub Apps → New, callback URL `https://gaitovrat.cloudflareaccess.com/cdn-cgi/access/callback`, account permission **Email addresses: Read-only** (Access matches your email). Generate a client secret. In 1Password: item `Github HomelabAuth App` in `Homelab`, field `ClientID` and the client secret as `password`.
-2. **1Password:** item `Cloudflare Access` in `Homelab` with text fields `owner email` (your GitHub primary email) and `allowed emails` (JSON list, e.g. `["a@example.com"]`, or `[]`). `.envrc` loads both items as `TF_VAR_access_*`.
+2. **1Password:** item `Cloudflare Access` in `Homelab` with your GitHub primary email as `username` and a text field `allowed emails` (JSON list, e.g. `["a@example.com"]`, or `[]`). `.envrc` loads both items as `TF_VAR_access_*`.
 3. **Actions secrets:** `ACCESS_OWNER_EMAIL`, `ACCESS_ALLOWED_EMAILS`, `ACCESS_GITHUB_CLIENT_ID`, `ACCESS_GITHUB_CLIENT_SECRET`, with the same values.
 4. **API token:** add Account → Access: Apps and Policies → Edit, and Account → Access: Organizations, Identity Providers, and Groups → Edit.
 
