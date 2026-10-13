@@ -33,7 +33,7 @@ One-time setup per machine:
    - macOS: the [Tailscale app](https://tailscale.com/download/mac), with its CLI on `PATH` (app settings → CLI integration) so the dev shell can check it.
    - Linux and WSL: `curl -fsSL https://tailscale.com/install.sh | sh`, then `sudo tailscale up`. On WSL this installs Tailscale inside the distro and needs systemd (see step 1). WSL then shows up as a machine of its own in the admin console.
 3. Install the 1Password app and its CLI (`op`), and turn on app → Settings → Developer → **Integrate with 1Password CLI**. The CLI has to be installed next to the app to unlock through it, so it can't come from the dev shell. The Ansible vault key and the Sealed Secrets key backup live there; see [`ansible/README.md`](ansible/README.md#one-time-setup).
-4. Optional, to enter the shell on `cd`: install [direnv](https://direnv.net) and [nix-direnv](https://github.com/nix-community/nix-direnv), then `direnv allow` in the repo.
+4. Optional, to enter the shell on `cd`: install [direnv](https://direnv.net), then `direnv allow` in the repo. `.envrc` loads a pinned [nix-direnv](https://github.com/nix-community/nix-direnv) unless a recent enough one is installed already, which caches the shell so `cd` is instant.
 
 Then `nix develop` (or just `cd` with direnv) gives a shell with everything on `PATH`. The first run downloads the tools and builds `.venv`; later runs are instant. To add a tool, add it to `packages` in `flake.nix`.
 
