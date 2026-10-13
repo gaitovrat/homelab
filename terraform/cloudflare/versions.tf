@@ -13,7 +13,7 @@ terraform {
   # State in Cloudflare R2 through its S3 API. The bucket and its access key are created
   # by hand once (see README). The key comes from AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY,
   # the endpoint from AWS_ENDPOINT_URL_S3 (https://<CLOUDFLARE_ACCOUNT_ID>.r2.cloudflarestorage.com),
-  # which tofu.sh (or CI) sets.
+  # which .envrc (or CI) sets.
   backend "s3" {
     bucket       = "homelab-tfstate"
     key          = "cloudflare/terraform.tfstate"
