@@ -23,6 +23,24 @@ tofu apply
 
 Credentials are the repo's Actions secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. Run by hand only to debug, or when CI is broken.
 
+## Access
+
+Cloudflare Access ([`access.tf`](access.tf)) puts a login in front of `argocd`, `files` and `test`:
+
+| App | Who |
+|---|---|
+| `argocd.gaitovrat.dev`, `test.gaitovrat.dev` | you, signing in with GitHub (sent straight to GitHub) |
+| `files.gaitovrat.dev` | you with GitHub, and friends on the allowlist with a one-time PIN by email |
+
+The emails and the GitHub OAuth app are sensitive variables, kept out of this public repo. One-time setup:
+
+1. **GitHub OAuth app:** GitHub → Settings → Developer settings → OAuth Apps → New, homepage `https://gaitovrat.cloudflareaccess.com`, callback `https://gaitovrat.cloudflareaccess.com/cdn-cgi/access/callback`. Generate a client secret.
+2. **1Password:** item `Cloudflare Access` in `Homelab` with text fields `owner email` (your GitHub primary email), `friend emails` (JSON list, e.g. `["a@example.com"]`, or `[]`), `github client id`, and a password field `github client secret`. `.envrc` loads them as `TF_VAR_access_*`.
+3. **Actions secrets:** `ACCESS_OWNER_EMAIL`, `ACCESS_FRIEND_EMAILS`, `ACCESS_GITHUB_CLIENT_ID`, `ACCESS_GITHUB_CLIENT_SECRET`, with the same values.
+4. **API token:** add Account → Access: Apps and Policies → Edit, and Account → Access: Organizations, Identity Providers, and Groups → Edit.
+
+To change the allowlist, edit `friend emails` in 1Password and `ACCESS_FRIEND_EMAILS`, then apply (by hand, or re-run the `terraform` workflow on `main`).
+
 ## Tunnel token
 
 cloudflared authenticates with the tunnel token. Never commit it or print it in CI; pipe it straight into the SealedSecret cloudflared reads ([`manifests/cloudflared`](../../manifests/cloudflared)). Reseal only if the tunnel is recreated:

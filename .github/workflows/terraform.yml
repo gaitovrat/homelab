@@ -34,6 +34,12 @@ env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_ENDPOINT_URL_S3: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+  # Cloudflare Access: emails and the GitHub OAuth app. Sensitive variables, so plans
+  # redact them.
+  TF_VAR_access_owner_email: ${{ secrets.ACCESS_OWNER_EMAIL }}
+  TF_VAR_access_friend_emails: ${{ secrets.ACCESS_FRIEND_EMAILS }}
+  TF_VAR_access_github_client_id: ${{ secrets.ACCESS_GITHUB_CLIENT_ID }}
+  TF_VAR_access_github_client_secret: ${{ secrets.ACCESS_GITHUB_CLIENT_SECRET }}
 
 defaults:
   run:
