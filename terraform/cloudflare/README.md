@@ -14,17 +14,17 @@ State is in the R2 bucket `homelab-tfstate` (key `cloudflare/terraform.tfstate`)
 Terraform can't create the bucket it keeps its own state in, or the token it runs with, so these are made once in the Cloudflare dashboard and kept in 1Password (vault `Homelab`):
 
 1. **R2 bucket:** R2 → Create bucket → `homelab-tfstate`, location automatic.
-2. **R2 access key:** R2 → Manage API tokens → Create API token, permission **Object Read & Write**, limited to `homelab-tfstate`. Save it as a 1Password login `homelab-tfstate-r2`: *username* = Access Key ID, *password* = Secret Access Key, plus a text field `endpoint` = the S3 endpoint shown (`https://<account_id>.r2.cloudflarestorage.com`).
+2. **R2 access key:** R2 → Manage API tokens → Create API token, permission **Object Read & Write**, limited to `homelab-tfstate`. Save it as a 1Password login `homelab-tfstate-r2`: *username* = Access Key ID, *password* = Secret Access Key.
 3. **API token:** My Profile → API Tokens → Create Custom Token, named `homelab-terraform`:
    - Zone → Zone → Read, Zone → Zone Settings → Edit, Zone → DNS → Edit; zone resources: `gaitovrat.dev` only.
    - Account → Cloudflare Tunnel → Edit; account resources: your account.
    - Later, for Cloudflare Access (gaitovrat/homelab-tasks#14): Account → Access: Apps and Policies → Edit.
 
-   Save it as a 1Password API Credential `homelab-cloudflare-terraform` (the token in *credential*).
+   Save it as a 1Password API Credential `homelab-cloudflare-terraform`: the token in *credential*, plus a text field `account_id` with the account ID (dashboard → account home → Account ID).
 
 ## Running
 
-[`tofu.sh`](tofu.sh) reads all four values from 1Password in one `op inject` (on WSL through the Windows `op.exe`), puts them in the environment and runs `tofu` in this directory. Nothing is written to disk or shell history.
+[`tofu.sh`](tofu.sh) reads four values from 1Password in one `op inject` (on WSL through the Windows `op.exe`) into the same variables as the repo's GitHub Actions secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`. It derives the R2 endpoint `AWS_ENDPOINT_URL_S3` from the account ID and runs `tofu` in this directory. Nothing is written to disk or shell history.
 
 ```sh
 cd terraform/cloudflare
@@ -33,7 +33,7 @@ cd terraform/cloudflare
 ./tofu.sh apply
 ```
 
-Another vault: `HOMELAB_OP_VAULT=<vault> ./tofu.sh plan`. Without 1Password, set `CLOUDFLARE_API_TOKEN`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_ENDPOINT_URL_S3` yourself and run `tofu` directly.
+Another vault: `HOMELAB_OP_VAULT=<vault> ./tofu.sh plan`. Without 1Password, set those four variables plus `AWS_ENDPOINT_URL_S3=https://$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com` yourself and run `tofu` directly.
 
 From gaitovrat/homelab-tasks#12 on, `plan` runs on PRs and `apply` on merge to `main` in GitHub Actions; run it by hand only for the first apply or to debug.
 
