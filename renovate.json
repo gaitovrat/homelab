@@ -18,8 +18,8 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Versions pinned in Ansible role defaults with a `# renovate:` comment",
-      "managerFilePatterns": ["/^ansible/.+/defaults/main\\.ya?ml$/"],
+      "description": "Versions pinned with a `# renovate:` comment in Ansible role defaults and workflow env",
+      "managerFilePatterns": ["/^ansible/.+/defaults/main\\.ya?ml$/", "/^\\.github/workflows/.+\\.ya?ml$/"],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)( extractVersion=(?<extractVersion>\\S+))?( versioning=(?<versioning>\\S+))?\\s+\\w+: \"?(?<currentValue>[^\"\\s]+)\"?"
       ],
