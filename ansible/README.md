@@ -164,7 +164,7 @@ Uninstall (wipes the cluster and its local-path volumes): `ssh k3s-01.tailbc9346
 
 ## Argo CD
 
-The last thing Ansible installs; everything after it, Argo CD included, is deployed from Git. Argo CD manages itself through the `argocd` Application in [`apps/argocd.yaml`](../apps/argocd.yaml): the `argo-cd` chart (`ghcr.io/argoproj/argo-helm`), its pinned version and its values (no Dex, no notifications, one replica of everything, no HA Redis, no exec terminal in the UI). The role reads chart, version and values from that same file, so bootstrap and Git never disagree.
+The last thing Ansible installs; everything after it, Argo CD included, is deployed from Git. Argo CD manages itself through the `argocd` Application in [`apps/argocd.yaml`](../apps/argocd.yaml): the `argo-cd` chart (`ghcr.io/argoproj/argo-helm`), its pinned version and its values (no Dex, no notifications, one replica of everything, no HA Redis, no exec terminal in the UI, SSO through Cloudflare Access and no local `admin`). The role reads chart, version and values from that same file, so bootstrap and Git never disagree.
 
 A run does one of two things:
 
@@ -177,13 +177,7 @@ A run does one of two things:
 A cluster bootstrapped by an earlier version of this role (`HelmChart` plus a k3s-applied `root`) goes through the same steps on its next run, once `apps/argocd.yaml` is on `main`.
 
 - **Version and values:** edit `apps/argocd.yaml`. Renovate opens a PR for new chart versions; after merge Argo CD syncs and upgrades itself. No Ansible run needed.
-- **UI:** not exposed yet (that comes with Cloudflare Tunnel + Access). Until then, port-forward over the tailnet and log in as `admin` with the generated initial password:
-
-  ```sh
-  kubectl --context homelab -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d; echo
-  kubectl --context homelab -n argocd port-forward svc/argocd-server 8080:443   # https://localhost:8080
-  ```
-
+- **UI:** https://argocd.gaitovrat.dev, through Cloudflare Access and SSO; there is no local `admin` (see [`apps/README.md`](../apps/README.md#reaching-argo-cd)). On a freshly bootstrapped cluster SSO works once `root` has synced `argocd-oidc` (the client secret). Until then, or whenever SSO is broken, use the CLI in core mode over Tailscale: `argocd app list --core`, or `argocd admin dashboard` for the UI on localhost.
 - **Breaking Argo CD from Git:** a bad change to `apps/argocd.yaml` can stop Argo CD from syncing its own fix. Revert it, then apply the fixed Application by hand: `kubectl --context homelab apply -f apps/argocd.yaml`. If Argo CD is down altogether, render and apply the chart yourself: `helm template argocd oci://ghcr.io/argoproj/argo-helm/argo-cd --version <v> -n argocd -f <values> | kubectl --context homelab apply --server-side -f -`.
 - **Uninstall:** delete the `argocd` and `root` Applications (no finalizers, so the workloads stay), then delete the `argocd` namespace. The CRDs, and so any Application objects, stay until deleted by hand.
 
