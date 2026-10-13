@@ -1,0 +1,120 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: filebrowser
+  labels:
+    app.kubernetes.io/name: filebrowser
+spec:
+  replicas: 1
+  # SQLite on a ReadWriteOnce volume: never two pods at once.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: filebrowser
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: filebrowser
+    spec:
+      automountServiceAccountToken: false
+      # The HDD is exFAT, mounted with every file as uid/gid 1000
+      # (ansible host_vars), which is also the image's user.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: config
+          image: gtstef/filebrowser:2.0.1-stable-slim
+          command:
+            - sh
+            - -ec
+            - |
+              # Refuse to start unless the HDD is mounted: otherwise uploads
+              # would land on the SD card under the empty mount point.
+              grep " /srv/hdd1 " /proc/self/mountinfo | grep -q " - exfat " \
+                || { echo "/srv/hdd1 is not the exFAT HDD; is the disk plugged in?" >&2; exit 1; }
+              owner=$(printf '%s' "$OWNER_EMAIL" | sed 's/[&|\\]/\\&/g')
+              sed "s|__OWNER_EMAIL__|$owner|" /template/config.yaml > /config/config.yaml
+          env:
+            - name: OWNER_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: filebrowser-owner
+                  key: email
+          volumeMounts:
+            - name: template
+              mountPath: /template
+            - name: config
+              mountPath: /config
+            - name: hdd1
+              mountPath: /srv/hdd1
+              readOnly: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+      containers:
+        - name: filebrowser
+          image: gtstef/filebrowser:2.0.1-stable-slim
+          env:
+            - name: FILEBROWSER_CONFIG
+              value: /config/config.yaml
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 768Mi
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: data
+              mountPath: /home/filebrowser/data
+            - name: tmp
+              mountPath: /tmp
+            - name: hdd1
+              mountPath: /srv/hdd1
+              # Picks up the disk if it's re-plugged while the pod runs.
+              mountPropagation: HostToContainer
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+      volumes:
+        - name: template
+          configMap:
+            name: filebrowser-config
+        - name: config
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: data
+          persistentVolumeClaim:
+            claimName: filebrowser-data
+        - name: hdd1
+          hostPath:
+            path: /mnt/disks/hdd1
+            type: Directory
