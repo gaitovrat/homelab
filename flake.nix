@@ -14,13 +14,7 @@
         f:
         nixpkgs.lib.genAttrs systems (
           system:
-          f (
-            import nixpkgs {
-              inherit system;
-              # The only unfree packages allowed in the shell.
-              config.allowUnfreePredicate = pkg: builtins.elem (nixpkgs.lib.getName pkg) [ "1password-cli" ];
-            }
-          )
+          f nixpkgs.legacyPackages.${system}
         );
     in
     {
@@ -36,10 +30,6 @@
             kubernetes-helm
             kubeseal
             jq
-
-            # Secrets: the Ansible vault key and Sealed Secrets key backup live in 1Password.
-            # On WSL, ansible/vault-pass.sh uses the Windows op.exe instead (see ansible/README.md).
-            _1password-cli
 
             # Repo and CI
             git
