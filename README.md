@@ -29,7 +29,10 @@ Every CLI this repo needs (Ansible and ansible-lint, kubectl, helm, kubeseal, jq
 One-time setup per machine:
 
 1. Install Nix with flakes on: `curl -fsSL https://install.determinate.systems/nix | sh -s -- install` (on WSL, enable systemd first: `[boot] systemd=true` in `/etc/wsl.conf`, then `wsl --shutdown`).
-2. Optional, to enter the shell on `cd`: install [direnv](https://direnv.net) and [nix-direnv](https://github.com/nix-community/nix-direnv), then `direnv allow` in the repo.
+2. Install Tailscale and log in to the tailnet. `site.yml`, `ssh` and kubectl reach the nodes only by their MagicDNS names. Tailscale runs as a system daemon (`tailscaled`), so it can't come from the dev shell, which warns when it's missing:
+   - macOS: the [Tailscale app](https://tailscale.com/download/mac), with its CLI on `PATH` (app settings → CLI integration) so the dev shell can check it.
+   - Linux and WSL: `curl -fsSL https://tailscale.com/install.sh | sh`, then `sudo tailscale up`. On WSL this installs Tailscale inside the distro and needs systemd (see step 1). WSL then shows up as a machine of its own in the admin console.
+3. Optional, to enter the shell on `cd`: install [direnv](https://direnv.net) and [nix-direnv](https://github.com/nix-community/nix-direnv), then `direnv allow` in the repo.
 
 Then `nix develop` (or just `cd` with direnv) gives a shell with everything on `PATH`. The first run downloads the tools and builds `.venv`; later runs are instant. To add a tool, add it to `packages` in `flake.nix`.
 
