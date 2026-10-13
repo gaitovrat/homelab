@@ -1,0 +1,21 @@
+# Argo CD's OIDC client secret for SSO through Cloudflare Access, as a
+# SealedSecret. Separate from apps/argocd.yaml, which the Ansible bootstrap
+# reads as a single chart source.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-oidc
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/gaitovrat/homelab.git
+    targetRevision: main
+    path: manifests/argocd-oidc
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
