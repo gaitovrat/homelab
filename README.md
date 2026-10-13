@@ -34,15 +34,6 @@ One-time setup per machine:
    - Linux: `curl -fsSL https://tailscale.com/install.sh | sh`, then `sudo tailscale up`.
    - WSL: the [Tailscale app on Windows](https://tailscale.com/download/windows), not inside the distro, because ssh runs on Windows (see step 3). WSL's traffic goes out through Windows, so kubectl in WSL uses the same connection.
 3. Install the 1Password app and its CLI (`op`), and turn on app → Settings → Developer → **Integrate with 1Password CLI**. The CLI has to be installed next to the app to unlock through it, so it can't come from the dev shell. The Ansible vault key and the Sealed Secrets key backup live there; see [`ansible/README.md`](ansible/README.md#one-time-setup).
-
-   The SSH key for the nodes (`K3s Node SSH`) is in the `Homelab` vault too, served by the [1Password SSH agent](https://developer.1password.com/docs/ssh/agent/): turn on app → Settings → Developer → **Use the SSH agent**, and enable the vault in the agent's `agent.toml` (only `Private` is on by default):
-
-   ```toml
-   [[ssh-keys]]
-   vault = "Homelab"
-   ```
-
-   `ssh-add -l` should list the key. On **WSL**, a Linux ssh can't reach the Windows agent, so [use `ssh.exe`](https://developer.1password.com/docs/ssh/integrations/wsl/) (and `ssh-add.exe`): the dev shell points Ansible at it whenever it's on `PATH`, and turns off connection multiplexing, which Windows OpenSSH lacks. For the `ssh` commands in these READMEs, run them as `ssh.exe` on WSL.
 4. Optional, to enter the shell on `cd`: install [direnv](https://direnv.net), then `direnv allow` in the repo. `.envrc` loads a pinned [nix-direnv](https://github.com/nix-community/nix-direnv) unless a recent enough one is installed already, which caches the shell so `cd` is instant.
 
 Then `nix develop` (or just `cd` with direnv) gives a shell with everything on `PATH`. The first run downloads the tools and builds `.venv`; later runs are instant. To add a tool, add it to `packages` in `flake.nix`.
@@ -75,10 +66,10 @@ The private key is a Secret in `kube-system` labelled `sealedsecrets.bitnami.com
 kubectl --context homelab -n kube-system get secret -l sealedsecrets.bitnami.com/sealed-secrets-key -o json \
   | jq '{apiVersion: "v1", kind: "List", items: [.items[] | {apiVersion, kind, type, data,
          metadata: {name: .metadata.name, namespace: .metadata.namespace, labels: .metadata.labels}}]}' \
-  | op document create - --vault Homelab --title homelab-sealed-secrets-key --file-name sealed-secrets-key.json
+  | op document create - --vault <vault> --title <item> --file-name sealed-secrets-key.json
 ```
 
-`jq` keeps only what a restore needs (no `uid` or `resourceVersion`, which a new cluster would reject). The key never touches the disk. If the controller ever gets a new key (a key secret was deleted, or `keyrenewperiod` changed), replace the backup: same pipeline, ending in `op document edit homelab-sealed-secrets-key - --vault Homelab`.
+`jq` keeps only what a restore needs (no `uid` or `resourceVersion`, which a new cluster would reject). The key never touches the disk. If the controller ever gets a new key (a key secret was deleted, or `keyrenewperiod` changed), replace the backup: same pipeline, ending in `op document edit <item> - --vault <vault>`.
 
 ### Restoring the key
 
@@ -86,7 +77,7 @@ On a rebuilt cluster, Argo CD deploys the controller, which generates a fresh ke
 
 ```sh
 kubectl --context homelab -n kube-system delete secret -l sealedsecrets.bitnami.com/sealed-secrets-key
-op document get homelab-sealed-secrets-key --vault Homelab | kubectl --context homelab apply -f -
+op document get <item> --vault <vault> | kubectl --context homelab apply -f -
 kubectl --context homelab -n kube-system rollout restart deployment sealed-secrets-controller
 ```
 
