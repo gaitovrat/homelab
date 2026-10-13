@@ -15,3 +15,31 @@ variable "tunnel_origin" {
   type        = string
   default     = "http://traefik.kube-system.svc:80"
 }
+
+# Cloudflare Access. Personal data and secrets, so no defaults: locally from
+# 1Password (.envrc), in CI from Actions secrets. All sensitive, so plans
+# redact them.
+
+variable "access_owner_email" {
+  description = "Your email, as GitHub reports it (primary email). Gets every Access app, signing in with GitHub."
+  type        = string
+  sensitive   = true
+}
+
+variable "access_allowed_emails" {
+  description = "Allowlist for FileBrowser, signing in with a one-time PIN sent by email."
+  type        = list(string)
+  default     = []
+  sensitive   = true
+}
+
+variable "access_github_client_id" {
+  description = "Client ID of the GitHub App Access signs you in with."
+  type        = string
+}
+
+variable "access_github_client_secret" {
+  description = "Client secret of that GitHub App."
+  type        = string
+  sensitive   = true
+}
