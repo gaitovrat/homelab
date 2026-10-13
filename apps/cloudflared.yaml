@@ -1,0 +1,24 @@
+# cloudflared: the Cloudflare Tunnel connector. All external traffic for
+# *.gaitovrat.dev comes in through it and goes to Traefik. The tunnel and its
+# ingress rules live in Cloudflare (terraform/cloudflare); the pods only need
+# the tunnel token, committed as a SealedSecret.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cloudflared
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/gaitovrat/homelab.git
+    targetRevision: main
+    path: manifests/cloudflared
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cloudflared
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

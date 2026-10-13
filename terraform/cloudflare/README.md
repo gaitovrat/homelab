@@ -25,10 +25,10 @@ Credentials are the repo's Actions secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_A
 
 ## Tunnel token
 
-cloudflared authenticates with the tunnel token. Never commit it or print it in CI; pipe it straight into a Sealed Secret (namespace and name are set by the cloudflared app):
+cloudflared authenticates with the tunnel token. Never commit it or print it in CI; pipe it straight into the SealedSecret cloudflared reads ([`manifests/cloudflared`](../../manifests/cloudflared)). Reseal only if the tunnel is recreated:
 
 ```sh
 tofu output -raw tunnel_token \
-  | kubectl create secret generic <name> -n <namespace> --from-file=token=/dev/stdin --dry-run=client -o yaml \
-  | kubeseal --context homelab -o yaml > <name>.sealed.yaml
+  | kubectl create secret generic cloudflared-token -n cloudflared --from-file=token=/dev/stdin --dry-run=client -o yaml \
+  | kubeseal --context homelab -o yaml > ../../manifests/cloudflared/cloudflared-token.sealed.yaml
 ```

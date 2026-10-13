@@ -7,6 +7,9 @@
   "argocd": {
     "managerFilePatterns": ["/^apps/.+\\.ya?ml$/"]
   },
+  "kubernetes": {
+    "managerFilePatterns": ["/^manifests/.+\\.ya?ml$/"]
+  },
   "packageRules": [
     {
       "description": "Lint CI Python: stay within what the pinned ansible-core supports (2.21: <=3.14); raise with ansible-core",
