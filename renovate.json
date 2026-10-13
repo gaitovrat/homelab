@@ -2,6 +2,8 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
   "dependencyDashboard": true,
+  "nix": { "enabled": true },
+  "lockFileMaintenance": { "enabled": true },
   "argocd": {
     "managerFilePatterns": ["/^apps/.+\\.ya?ml$/"]
   },

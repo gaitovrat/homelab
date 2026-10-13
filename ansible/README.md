@@ -30,7 +30,7 @@ Ansible loads both automatically; for the same variable, the host's value wins. 
 
 ### One-time setup
 
-1. Install the CLI (`brew install 1password-cli`) and turn on 1Password → Settings → Developer → **Integrate with 1Password CLI**, so `op` unlocks through the app with Touch ID.
+1. Turn on 1Password → Settings → Developer → **Integrate with 1Password CLI**, so `op` unlocks through the app (Touch ID, Windows Hello). On macOS and Linux, `op` comes with the [dev shell](../README.md#tools). On **WSL**, a Linux `op` can't reach the Windows app, so install the Windows CLI instead (`winget install AgileBits.1Password.CLI`, in PowerShell): `vault-pass.sh` uses `op.exe` whenever it's on `PATH` (WSL puts Windows `PATH` there by default). For the other `op` commands in these READMEs, run them as `op.exe` on WSL.
 2. Generate the vault key in 1Password:
 
    ```sh
