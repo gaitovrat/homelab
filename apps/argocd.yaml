@@ -50,6 +50,9 @@ spec:
           cm:
             # No terminal into pods from the UI.
             exec.enabled: false
+            # SSO only (below), no local admin. If SSO breaks, use the CLI
+            # in core mode over Tailscale (apps/README.md).
+            admin.enabled: false
             # SSO through Cloudflare Access as the OIDC provider (no Dex):
             # the Access SaaS app "Argo CD SSO" in terraform/cloudflare, which
             # only you can sign in to (GitHub). The client secret is the
