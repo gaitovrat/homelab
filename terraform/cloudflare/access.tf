@@ -1,11 +1,11 @@
 # Cloudflare Access (Zero Trust, free plan) in front of the admin and file apps.
 # You sign in with GitHub; people on the allowlist get a one-time PIN by email,
-# and only for FileBrowser. Emails and the GitHub OAuth secret come from
+# and only for FileBrowser. Emails and the GitHub App secret come from
 # sensitive variables (1Password locally, Actions secrets in CI), never Git.
 
 # Identity providers
 
-# GitHub OAuth app, created by hand (see README); its callback is
+# GitHub App used for sign-in only, created by hand (see README); its callback is
 # https://<team>.cloudflareaccess.com/cdn-cgi/access/callback.
 resource "cloudflare_zero_trust_access_identity_provider" "github" {
   account_id = local.account_id

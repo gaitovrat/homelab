@@ -34,12 +34,12 @@ variable "access_allowed_emails" {
 }
 
 variable "access_github_client_id" {
-  description = "Client ID of the GitHub OAuth app Access signs you in with."
+  description = "Client ID of the GitHub App Access signs you in with."
   type        = string
 }
 
 variable "access_github_client_secret" {
-  description = "Client secret of that GitHub OAuth app."
+  description = "Client secret of that GitHub App."
   type        = string
   sensitive   = true
 }
