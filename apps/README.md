@@ -8,3 +8,8 @@ Argo CD Applications, one file per component. The root app ([`root.yaml`](root.y
 - **OCI charts:** `repoURL` without `oci://` (e.g. `ghcr.io/argoproj/argo-helm`) and the chart name in `chart`. Public registries need no repository secret.
 - **Sync policy:** `automated` with `prune: true` and `selfHeal: true` on every app, so the cluster always matches `main`.
 - **No `resources-finalizer`** on an Application unless deleting it should also delete its workloads.
+
+## Reaching Argo CD
+
+- **UI:** https://argocd.gaitovrat.dev, behind Cloudflare Access (you only, GitHub login; see [`terraform/cloudflare`](../terraform/cloudflare/README.md#access)), then Argo CD's own `admin` login. The initial password: `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d`. TLS ends at Cloudflare, so the server runs with `server.insecure` and Traefik routes plain HTTP to it.
+- **CLI:** `argocd` from the dev shell, in core mode: it talks to the Kubernetes API over Tailscale with the repo's kubeconfig, so it skips Access and needs no Argo CD login. Point the context at the `argocd` namespace once (`kubens argocd`), then e.g. `argocd app list --core`, `argocd app sync <app> --core`, or `argocd admin dashboard` for the UI on localhost.
