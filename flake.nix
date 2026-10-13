@@ -28,6 +28,7 @@
               kubectl
               kubernetes-helm
               kubeseal
+              kubectx # also provides kubens
               jq
 
               # Repo and CI
@@ -52,6 +53,10 @@
               fi
               export VIRTUAL_ENV="$PWD/.venv"
               export PATH="$VIRTUAL_ENV/bin:$PATH"
+
+              # kubectl, helm and kubeseal use a kubeconfig in the repo (gitignored), not
+              # ~/.kube/config. The k3s role writes the cluster into it.
+              export KUBECONFIG="$PWD/.kube/config"
 
               # On WSL, ssh goes through Windows: ssh.exe gets the node key from the 1Password
               # SSH agent and reaches the nodes over the Windows Tailscale app. Windows OpenSSH
