@@ -22,6 +22,17 @@ terraform/cloudflare/ DNS, tunnel, Access
 .github/workflows/    lint and Terraform plan/apply
 ```
 
+## Tools
+
+Every CLI this repo needs (Ansible and ansible-lint, kubectl, helm, kubeseal, jq, 1Password CLI, gh, actionlint, shellcheck) comes from the Nix dev shell in [`flake.nix`](flake.nix), pinned by `flake.lock`, the same on macOS, Linux and WSL. Ansible and ansible-lint are installed into `.venv` from [`.github/requirements-lint.txt`](.github/requirements-lint.txt), so local runs use the versions CI lints with. Renovate bumps both files.
+
+One-time setup per machine:
+
+1. Install Nix with flakes on: `curl -fsSL https://install.determinate.systems/nix | sh -s -- install` (on WSL, enable systemd first: `[boot] systemd=true` in `/etc/wsl.conf`, then `wsl --shutdown`).
+2. Optional, to enter the shell on `cd`: install [direnv](https://direnv.net) and [nix-direnv](https://github.com/nix-community/nix-direnv), then `direnv allow` in the repo.
+
+Then `nix develop` (or just `cd` with direnv) gives a shell with everything on `PATH`. The first run downloads the tools and builds `.venv`; later runs are instant. To add a tool, add it to `packages` in `flake.nix`.
+
 ## Secrets
 
 This repo is public, so every Kubernetes secret is committed as a **SealedSecret**: encrypted with the cluster's public key, decrypted in the cluster by the Sealed Secrets controller ([`apps/sealed-secrets.yaml`](apps/sealed-secrets.yaml), in `kube-system`). Only that controller holds the private key. Ansible secrets are separate, see [`ansible/README.md`](ansible/README.md#secrets-ansible-vault--1password).
@@ -30,7 +41,7 @@ The controller has a single sealing key and never rotates it (`keyrenewperiod: "
 
 ### Sealing a secret
 
-Install the client once: `brew install kubeseal`. Then build the Secret locally with `--dry-run` (nothing reaches the cluster) and seal it:
+`kubeseal` comes with the [dev shell](#tools). Build the Secret locally with `--dry-run` (nothing reaches the cluster) and seal it:
 
 ```sh
 kubectl create secret generic <name> -n <namespace> \
