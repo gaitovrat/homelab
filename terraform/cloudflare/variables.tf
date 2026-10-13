@@ -26,7 +26,7 @@ variable "access_owner_email" {
   sensitive   = true
 }
 
-variable "access_friend_emails" {
+variable "access_allowed_emails" {
   description = "Allowlist for FileBrowser, signing in with a one-time PIN sent by email."
   type        = list(string)
   default     = []

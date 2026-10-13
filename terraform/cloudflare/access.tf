@@ -1,5 +1,5 @@
 # Cloudflare Access (Zero Trust, free plan) in front of the admin and file apps.
-# You sign in with GitHub; friends on the allowlist get a one-time PIN by email,
+# You sign in with GitHub; people on the allowlist get a one-time PIN by email,
 # and only for FileBrowser. Emails and the GitHub OAuth secret come from
 # sensitive variables (1Password locally, Actions secrets in CI), never Git.
 
@@ -43,15 +43,15 @@ resource "cloudflare_zero_trust_access_policy" "owner" {
 }
 
 # Skipped while the allowlist is empty: a policy needs at least one include rule.
-resource "cloudflare_zero_trust_access_policy" "friends" {
-  count = nonsensitive(length(var.access_friend_emails)) > 0 ? 1 : 0
+resource "cloudflare_zero_trust_access_policy" "allowed" {
+  count = nonsensitive(length(var.access_allowed_emails)) > 0 ? 1 : 0
 
   account_id       = local.account_id
-  name             = "Friends (email PIN)"
+  name             = "Allowed emails (email PIN)"
   decision         = "allow"
   session_duration = "24h"
 
-  include = [for email in var.access_friend_emails : { email = { email = email } }]
+  include = [for email in var.access_allowed_emails : { email = { email = email } }]
   require = [{ login_method = { id = local.otp_idp_id } }]
 }
 
@@ -60,17 +60,17 @@ resource "cloudflare_zero_trust_access_policy" "friends" {
 locals {
   access_apps = {
     argocd = {
-      name    = "Argo CD"
-      friends = false
+      name           = "Argo CD"
+      allowed_emails = false
     }
     files = {
-      name    = "FileBrowser"
-      friends = true
+      name           = "FileBrowser"
+      allowed_emails = true
     }
     # whoami, to test the tunnel and Access end to end.
     test = {
-      name    = "Test (whoami)"
-      friends = false
+      name           = "Test (whoami)"
+      allowed_emails = false
     }
   }
 }
@@ -84,17 +84,17 @@ resource "cloudflare_zero_trust_access_application" "this" {
   type             = "self_hosted"
   session_duration = "24h"
 
-  # Owner-only apps go straight to GitHub; friends' apps show the choice.
+  # Owner-only apps go straight to GitHub; apps open to the allowlist show the choice.
   allowed_idps = concat(
     [cloudflare_zero_trust_access_identity_provider.github.id],
-    each.value.friends ? [local.otp_idp_id] : [],
+    each.value.allowed_emails ? [local.otp_idp_id] : [],
   )
-  auto_redirect_to_identity = !each.value.friends
+  auto_redirect_to_identity = !each.value.allowed_emails
 
   policies = [
     for i, id in concat(
       [cloudflare_zero_trust_access_policy.owner.id],
-      each.value.friends ? cloudflare_zero_trust_access_policy.friends[*].id : [],
+      each.value.allowed_emails ? cloudflare_zero_trust_access_policy.allowed[*].id : [],
     ) : { id = id, precedence = i + 1 }
   ]
 }
