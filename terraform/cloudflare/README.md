@@ -41,6 +41,17 @@ The emails and the GitHub OAuth App credentials are sensitive variables, kept ou
 
 To change the allowlist, edit `allowed emails` in 1Password and `ACCESS_ALLOWED_EMAILS`, then apply (by hand, or re-run the `terraform` workflow on `main`).
 
+### Argo CD SSO
+
+Access is also Argo CD's OIDC provider: the SaaS app `Argo CD SSO` (owner policy only) issues the tokens, and Argo CD (`apps/argocd.yaml`) maps your Access user ID to admin. Its client ID and issuer are outputs, committed in `apps/argocd.yaml`; the client secret is sealed into [`manifests/argocd-oidc`](../../manifests/argocd-oidc). Reseal only if the app is recreated:
+
+```sh
+tofu output -raw argocd_oidc_client_secret \
+  | kubectl create secret generic argocd-oidc-cloudflare -n argocd --from-file=clientSecret=/dev/stdin --dry-run=client -o yaml \
+  | kubectl label --local -f - app.kubernetes.io/part-of=argocd -o yaml \
+  | kubeseal --context homelab -o yaml > ../../manifests/argocd-oidc/argocd-oidc-cloudflare.sealed.yaml
+```
+
 ## Tunnel token
 
 cloudflared authenticates with the tunnel token. Never commit it or print it in CI; pipe it straight into the SealedSecret cloudflared reads ([`manifests/cloudflared`](../../manifests/cloudflared)). Reseal only if the tunnel is recreated:
