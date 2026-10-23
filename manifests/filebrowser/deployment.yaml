@@ -29,7 +29,7 @@ spec:
           type: RuntimeDefault
       initContainers:
         - name: config
-          image: gtstef/filebrowser:2.0.1-stable-slim
+          image: gtstef/filebrowser:2.0.2-stable-slim
           command:
             - sh
             - -ec
@@ -61,7 +61,7 @@ spec:
               drop: [ALL]
       containers:
         - name: filebrowser
-          image: gtstef/filebrowser:2.0.1-stable-slim
+          image: gtstef/filebrowser:2.0.2-stable-slim
           env:
             - name: FILEBROWSER_CONFIG
               value: /config/config.yaml
