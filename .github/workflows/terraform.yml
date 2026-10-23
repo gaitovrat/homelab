@@ -25,7 +25,7 @@ concurrency:
 
 env:
   # renovate: datasource=github-releases depName=opentofu/opentofu extractVersion=^v(?<version>.+)$
-  TOFU_VERSION: 1.13.1
+  TOFU_VERSION: 1.13.2
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "false"
   # Same names as terraform/cloudflare/.envrc. The repo is public: the plan never prints
