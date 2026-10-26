@@ -11,7 +11,7 @@ spec:
   source:
     repoURL: ghcr.io/argoproj/argo-helm
     chart: argo-cd
-    targetRevision: 10.11.1
+    targetRevision: 10.11.6
     helm:
       # Same release name as the bootstrap install, so Argo CD adopts the
       # resources it already runs instead of creating a second copy.
