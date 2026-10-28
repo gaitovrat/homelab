@@ -6,3 +6,7 @@ tls-san:
 {% for san in k3s_tls_san + k3s_tailnet_ips %}
   - "{{ san }}"
 {% endfor %}
+# Pinned to the tailnet IPv4: k3s fixes its node IP at start, and the LAN
+# address comes from DHCP and can change under it (homelab-tasks#46).
+node-ip: "{{ k3s_tailnet_ips | first }}"
+flannel-iface: tailscale0
