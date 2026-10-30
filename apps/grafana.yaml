@@ -16,10 +16,10 @@ spec:
     helm:
       releaseName: grafana
       valuesObject:
-        # Off until the Access app for stats.gaitovrat.dev is applied
-        # (terraform/cloudflare), so Grafana is never public without it.
+        # Cloudflare Access app `stats` (terraform/cloudflare) guards it;
+        # never enable this on a host without one.
         ingress:
-          enabled: false
+          enabled: true
           ingressClassName: traefik
           hosts:
             - stats.gaitovrat.dev
