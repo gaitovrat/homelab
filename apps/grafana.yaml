@@ -1,0 +1,110 @@
+# Grafana: dashboards for the metrics in VictoriaMetrics
+# (apps/victoria-metrics.yaml), at https://stats.gaitovrat.dev behind
+# Cloudflare Access. Read-only for every visitor: dashboards and the data
+# source come from this file, and there is no admin user or login form.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: grafana
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: ghcr.io/grafana-community/helm-charts
+    chart: grafana
+    targetRevision: 14.2.0
+    helm:
+      releaseName: grafana
+      valuesObject:
+        # Off until the Access app for stats.gaitovrat.dev is applied
+        # (terraform/cloudflare), so Grafana is never public without it.
+        ingress:
+          enabled: false
+          ingressClassName: traefik
+          hosts:
+            - stats.gaitovrat.dev
+        # No admin user, so the chart makes no admin Secret (a random
+        # password Argo CD would regenerate on every sync).
+        env:
+          GF_SECURITY_DISABLE_INITIAL_ADMIN_CREATION: "true"
+        grafana.ini:
+          server:
+            root_url: https://stats.gaitovrat.dev
+          analytics:
+            reporting_enabled: false
+            check_for_updates: false
+          # Everyone is an anonymous Viewer. Cloudflare Access decides who
+          # gets in; on the home LAN anyone can reach it through Traefik
+          # with the right Host header, and see the dashboards.
+          auth:
+            disable_login_form: true
+          auth.anonymous:
+            enabled: true
+            org_role: Viewer
+        # No `helm test` pod.
+        testFramework:
+          enabled: false
+        # Nothing to keep: settings and dashboards are provisioned at start.
+        persistence:
+          enabled: false
+        resources:
+          requests:
+            cpu: 20m
+            memory: 96Mi
+          limits:
+            memory: 256Mi
+        datasources:
+          datasources.yaml:
+            apiVersion: 1
+            datasources:
+              - name: VictoriaMetrics
+                uid: victoriametrics
+                # VictoriaMetrics answers the Prometheus query API.
+                type: prometheus
+                url: http://victoria-metrics.monitoring.svc:8428
+                access: proxy
+                isDefault: true
+                jsonData:
+                  # The scrape interval, so $__rate_interval is right.
+                  timeInterval: 30s
+        dashboardProviders:
+          dashboardproviders.yaml:
+            apiVersion: 1
+            providers:
+              - name: default
+                orgId: 1
+                folder: ""
+                type: file
+                disableDeletion: true
+                editable: false
+                options:
+                  path: /var/lib/grafana/dashboards/default
+        # Downloaded at pod start, pinned to a tag or commit (Renovate
+        # doesn't bump these; update the ref by hand).
+        dashboards:
+          default:
+            # Host details, including temperatures (Hardware Misc).
+            node-exporter-full:
+              url: https://raw.githubusercontent.com/rfmoz/grafana-dashboards/6c2de7ebaea4dd1dad7089d86d75de71417a3d0b/prometheus/node-exporter-full.json
+            # Cluster, namespace, node and pod views (dotdc/grafana-dashboards-kubernetes).
+            k8s-views-global:
+              url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/v3.0.8/dashboards/k8s-views-global.json
+              datasource: [{name: DS_PROMETHEUS, value: victoriametrics}]
+            k8s-views-namespaces:
+              url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/v3.0.8/dashboards/k8s-views-namespaces.json
+              datasource: [{name: DS_PROMETHEUS, value: victoriametrics}]
+            k8s-views-nodes:
+              url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/v3.0.8/dashboards/k8s-views-nodes.json
+              datasource: [{name: DS_PROMETHEUS, value: victoriametrics}]
+            k8s-views-pods:
+              url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/v3.0.8/dashboards/k8s-views-pods.json
+              datasource: [{name: DS_PROMETHEUS, value: victoriametrics}]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

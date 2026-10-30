@@ -1,0 +1,109 @@
+# VictoriaMetrics single node: scrapes and stores the cluster's metrics for
+# Grafana (apps/grafana.yaml). Sources: node-exporter (host CPU, memory, disks,
+# temperature), kube-state-metrics (objects) and the kubelet (container usage,
+# volume usage). See the README's Monitoring section.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: victoria-metrics
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: ghcr.io/victoriametrics/helm-charts
+    chart: victoria-metrics-single
+    targetRevision: 0.50.0
+    helm:
+      releaseName: victoria-metrics
+      valuesObject:
+        server:
+          # Service victoria-metrics:8428, Grafana's data source.
+          fullnameOverride: victoria-metrics
+          retentionPeriod: 30d
+          # On the SD card (local-path). At a 30 s interval a few thousand
+          # series take well under 1 GB for 30 days.
+          persistentVolume:
+            size: 4Gi
+          resources:
+            requests:
+              cpu: 20m
+              memory: 96Mi
+            limits:
+              memory: 384Mi
+          scrape:
+            enabled: true
+            config:
+              global:
+                scrape_interval: 30s
+              # Replaces the chart's list: only what the dashboards use, and
+              # no apiserver or full kubelet /metrics (in k3s those carry every
+              # component's metrics, tens of thousands of series).
+              scrape_configs:
+                - job_name: victoriametrics
+                  static_configs:
+                    - targets: ["localhost:8428"]
+
+                - job_name: node-exporter
+                  kubernetes_sd_configs:
+                    - role: endpoints
+                      namespaces:
+                        names: [monitoring]
+                  relabel_configs:
+                    - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+                      action: keep
+                      regex: node-exporter;metrics
+                    - source_labels: [__meta_kubernetes_pod_node_name]
+                      target_label: instance
+
+                # honor_labels keeps the namespace/pod labels of the objects
+                # it reports on, instead of its own pod's.
+                - job_name: kube-state-metrics
+                  honor_labels: true
+                  kubernetes_sd_configs:
+                    - role: endpoints
+                      namespaces:
+                        names: [monitoring]
+                  relabel_configs:
+                    - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+                      action: keep
+                      regex: kube-state-metrics;http
+
+                # Per-container CPU, memory and network.
+                - job_name: cadvisor
+                  scheme: https
+                  metrics_path: /metrics/cadvisor
+                  # kubelet's serving certificate is self-signed.
+                  tls_config:
+                    insecure_skip_verify: true
+                  bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+                  kubernetes_sd_configs:
+                    - role: node
+                  relabel_configs:
+                    - source_labels: [__meta_kubernetes_node_name]
+                      target_label: node
+                  honor_timestamps: false
+
+                # PVC usage only.
+                - job_name: kubelet
+                  scheme: https
+                  tls_config:
+                    insecure_skip_verify: true
+                  bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+                  kubernetes_sd_configs:
+                    - role: node
+                  relabel_configs:
+                    - source_labels: [__meta_kubernetes_node_name]
+                      target_label: node
+                  metric_relabel_configs:
+                    - source_labels: [__name__]
+                      action: keep
+                      regex: kubelet_volume_stats_.+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

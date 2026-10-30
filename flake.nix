@@ -29,6 +29,7 @@
               kubernetes-helm
               kubeseal
               kubectx # also provides kubens
+              k9s
               argocd
               jq
 

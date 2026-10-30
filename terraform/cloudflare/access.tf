@@ -67,6 +67,10 @@ locals {
       name           = "FileBrowser"
       allowed_emails = true
     }
+    stats = {
+      name           = "Grafana"
+      allowed_emails = false
+    }
     # whoami, to test the tunnel and Access end to end.
     test = {
       name           = "Test (whoami)"
