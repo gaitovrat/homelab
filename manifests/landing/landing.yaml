@@ -70,8 +70,7 @@ spec:
       port: 80
       targetPort: http
 ---
-# Through the tunnel: Cloudflare Access (apex app in terraform/cloudflare) →
-# cloudflared → Traefik.
+# Public through the tunnel (no Access app): cloudflared → Traefik.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:

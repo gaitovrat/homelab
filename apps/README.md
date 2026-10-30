@@ -16,7 +16,7 @@ Argo CD Applications, one file per component. The root app ([`root.yaml`](root.y
 
 ## Landing page
 
-[`landing.yaml`](landing.yaml) → [`manifests/landing`](../manifests/landing): a static page at https://gaitovrat.dev with a card for every service, served by nginx (about 5 MB of RAM), behind Cloudflare Access (you only). The page is [`index.html`](../manifests/landing/index.html); Kustomize turns it into a ConfigMap whose name changes with its content, so a merged edit rolls the pod. When you expose a new app, add a card there. The apex needs its own tunnel rule and DNS record (the `*.gaitovrat.dev` ones don't match it), both in [`terraform/cloudflare`](../terraform/cloudflare/main.tf).
+[`landing.yaml`](landing.yaml) → [`manifests/landing`](../manifests/landing): a static page at https://gaitovrat.dev with a card for every service, served by nginx (about 5 MB of RAM). It's public, with no Access login: it only lists links, and each app behind them has its own login. The page is [`index.html`](../manifests/landing/index.html); Kustomize turns it into a ConfigMap whose name changes with its content, so a merged edit rolls the pod. When you expose a new app, add a card there. The apex needs its own tunnel rule and DNS record (the `*.gaitovrat.dev` ones don't match it), both in [`terraform/cloudflare`](../terraform/cloudflare/main.tf).
 
 ## FileBrowser
 
