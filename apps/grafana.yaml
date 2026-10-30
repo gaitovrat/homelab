@@ -1,7 +1,8 @@
 # Grafana: dashboards for the metrics in VictoriaMetrics
 # (apps/victoria-metrics.yaml), at https://stats.gaitovrat.dev behind
-# Cloudflare Access. Read-only for every visitor: dashboards and the data
-# source come from this file, and there is no admin user or login form.
+# Cloudflare Access. Grafana trusts the Access login (no second sign-in):
+# dashboards and the data source come from this file, and there is no
+# admin user or login form.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -33,14 +34,27 @@ spec:
           analytics:
             reporting_enabled: false
             check_for_updates: false
-          # Everyone is an anonymous Viewer. Cloudflare Access decides who
-          # gets in; on the home LAN anyone can reach it through Traefik
-          # with the right Host header, and see the dashboards.
+          # Single sign-on through Cloudflare Access: Access puts a signed
+          # JWT of the signed-in user in this header on every request, and
+          # Grafana checks it against Access's keys. A request without a
+          # valid token (e.g. from the LAN straight to Traefik) gets nothing.
           auth:
             disable_login_form: true
-          auth.anonymous:
+          auth.jwt:
             enabled: true
-            org_role: Viewer
+            header_name: Cf-Access-Jwt-Assertion
+            email_claim: email
+            username_claim: email
+            jwk_set_url: https://gaitovrat.cloudflareaccess.com/cdn-cgi/access/certs
+            cache_ttl: 60m
+            # Only tokens Access issued for the `stats` app (its AUD tag),
+            # not ones for the other Access apps.
+            expect_claims: '{"iss": "https://gaitovrat.cloudflareaccess.com", "aud": ["fb754e29f0d49e4d0a0cf75663c7e4b9c8e71feec895d024f9db1cdb738029bf"]}'
+            auto_sign_up: true
+            # Your Access user ID (`sub`, opaque, so no email in this public
+            # repo; same ID as in apps/argocd.yaml) is Admin, anyone else
+            # Access lets in is a Viewer.
+            role_attribute_path: "sub == '71fc5e5c-1a5f-5bd9-94e1-5b2536589327' && 'Admin' || 'Viewer'"
         # No `helm test` pod.
         testFramework:
           enabled: false
