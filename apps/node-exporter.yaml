@@ -1,0 +1,36 @@
+# Prometheus node-exporter: host metrics (CPU, memory, disks, network, SoC
+# temperature) for VictoriaMetrics (apps/victoria-metrics.yaml).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: node-exporter
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: ghcr.io/prometheus-community/charts
+    chart: prometheus-node-exporter
+    targetRevision: 4.60.1
+    helm:
+      releaseName: node-exporter
+      valuesObject:
+        # Service node-exporter; the scrape config matches on the name.
+        fullnameOverride: node-exporter
+        # In the host network (the chart's default), so network metrics are
+        # the host's. It listens on the node IP only, which is the tailnet
+        # address (roles/k3s), so port 9100 isn't open on the LAN.
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            memory: 64Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

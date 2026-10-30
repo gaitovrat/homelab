@@ -22,3 +22,12 @@ Argo CD Applications, one file per component. The root app ([`root.yaml`](root.y
 - **Everyone who can sign in gets the whole disk** (view, download, upload, modify, delete, share); only you get admin settings.
 - **Security:** FileBrowser trusts that header blindly. Through the tunnel, Cloudflare Access sets it; but anyone on the home LAN can reach Traefik directly with `Host: files.gaitovrat.dev` and a forged header, and become admin.
 - **Disk missing:** the pod won't start unless `/srv/hdd1` is the exFAT HDD, so uploads never land on the SD card under an empty mount point.
+
+## Monitoring
+
+Everything in the `monitoring` namespace, about 300 MB of RAM in all:
+
+- [`victoria-metrics.yaml`](victoria-metrics.yaml): VictoriaMetrics single node, scraping every 30 s and keeping 30 days on a 4 Gi `local-path` volume (SD card). It scrapes node-exporter, kube-state-metrics and the kubelet (cAdvisor for containers, volume stats for PVCs); the scrape config is inline, so a new target is a new entry there. Not the full kubelet or apiserver `/metrics`: in k3s each carries every component's metrics. Query it directly with `kubectl --context homelab -n monitoring port-forward svc/victoria-metrics 8428`, then http://localhost:8428/vmui (and `/targets` for scrape status).
+- [`node-exporter.yaml`](node-exporter.yaml): host metrics, including SoC temperature (`node_hwmon_temp_celsius`, `node_thermal_zone_temp`). Host network, listening on the tailnet IP only.
+- [`kube-state-metrics.yaml`](kube-state-metrics.yaml): object state (pods, deployments, PVCs, restarts).
+- [`grafana.yaml`](grafana.yaml): Grafana at https://stats.gaitovrat.dev. Anonymous Viewer for everyone who gets past Cloudflare Access, no login form and no admin user, so nothing in the UI can be changed: the data source and dashboards are provisioned from that file (dashboards downloaded at pod start from pinned GitHub refs), and nothing is stored. To add a dashboard, add its JSON URL under `dashboards`. On the home LAN, anyone can reach it through Traefik with `Host: stats.gaitovrat.dev` and see the dashboards (read-only).

@@ -86,7 +86,8 @@ Check: `kubectl --context homelab get sealedsecrets -A` shows every SealedSecret
 
 ## Monitoring
 
-Light for now, to save RAM: no metrics stack runs in the cluster, only the metrics-server bundled with k3s. It keeps the latest CPU and memory sample per node and pod (no history), which is enough for day-to-day checks from the dev shell:
+- **Grafana** at https://stats.gaitovrat.dev (behind Cloudflare Access, you only): host, cluster, namespace, node and pod dashboards with 30 days of history, Pi temperature under *Node Exporter Full → Hardware Misc*. Read-only, set up from Git; see [`apps/README.md`](apps/README.md#monitoring).
+- **From the dev shell**, live numbers from the metrics-server bundled with k3s (latest sample only, no history):
 
 ```sh
 kubectl --context homelab top nodes            # node CPU and memory; keep ≥1 GB free
