@@ -25,7 +25,7 @@ terraform/cloudflare/ DNS, tunnel, Access
 
 ## Tools
 
-Every CLI this repo needs (Ansible and ansible-lint, kubectl, kubectx and kubens, helm, kubeseal, jq, OpenTofu, gh, actionlint, shellcheck) comes from the Nix dev shell in [`flake.nix`](flake.nix), pinned by `flake.lock`, the same on macOS, Linux and WSL. direnv loads it from [`.envrc`](.envrc); its `shellHook` installs Ansible and ansible-lint into `.venv` from [`.github/requirements-lint.txt`](.github/requirements-lint.txt), so local runs use the versions CI lints with. Renovate bumps both files.
+Every CLI this repo needs (Ansible and ansible-lint, kubectl, kubectx and kubens, k9s, helm, kubeseal, jq, OpenTofu, gh, actionlint, shellcheck) comes from the Nix dev shell in [`flake.nix`](flake.nix), pinned by `flake.lock`, the same on macOS, Linux and WSL. direnv loads it from [`.envrc`](.envrc); its `shellHook` installs Ansible and ansible-lint into `.venv` from [`.github/requirements-lint.txt`](.github/requirements-lint.txt), so local runs use the versions CI lints with. Renovate bumps both files.
 
 One-time setup per machine:
 
@@ -83,6 +83,18 @@ kubectl --context homelab -n kube-system rollout restart deployment sealed-secre
 ```
 
 Check: `kubectl --context homelab get sealedsecrets -A` shows every SealedSecret as synced, and the cert from `kubeseal --context homelab --fetch-cert` is the same as before.
+
+## Monitoring
+
+Light for now, to save RAM: no metrics stack runs in the cluster, only the metrics-server bundled with k3s. It keeps the latest CPU and memory sample per node and pod (no history), which is enough for day-to-day checks from the dev shell:
+
+```sh
+kubectl --context homelab top nodes            # node CPU and memory; keep ≥1 GB free
+kubectl --context homelab top pods -A --sort-by=memory
+k9s --context homelab                          # terminal UI over the same API
+```
+
+In k9s, the CPU and memory columns (and `%CPU/R`, `%MEM/L` against requests and limits) come from metrics-server too. Handy keys: `:pods`, `:deploy`, `:events`, `:pulses` for an overview, `0` for all namespaces, `l` for logs, `s` for a shell, `shift-m` to sort by memory. k9s reads the same `KUBECONFIG` as kubectl, so it reaches the cluster over Tailscale wherever kubectl does.
 
 ## Status
 
