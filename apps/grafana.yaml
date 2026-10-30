@@ -47,12 +47,14 @@ spec:
         # Nothing to keep: settings and dashboards are provisioned at start.
         persistence:
           enabled: false
+        # Grafana 13 builds its search index and API server at start; at
+        # 256Mi it was OOMKilled in a loop and never became ready.
         resources:
           requests:
             cpu: 20m
-            memory: 96Mi
+            memory: 192Mi
           limits:
-            memory: 256Mi
+            memory: 512Mi
         datasources:
           datasources.yaml:
             apiVersion: 1
