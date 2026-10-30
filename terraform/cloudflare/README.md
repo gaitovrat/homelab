@@ -25,11 +25,11 @@ Credentials are the repo's Actions secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_A
 
 ## Access
 
-Cloudflare Access ([`access.tf`](access.tf)) puts a login in front of `argocd`, `files`, `stats` and `test`:
+Cloudflare Access ([`access.tf`](access.tf)) puts a login in front of the landing page (the apex), `argocd`, `files`, `stats` and `test`:
 
 | App | Who |
 |---|---|
-| `argocd.gaitovrat.dev`, `stats.gaitovrat.dev`, `test.gaitovrat.dev` | you, signing in with GitHub (sent straight to GitHub) |
+| `gaitovrat.dev`, `argocd.gaitovrat.dev`, `stats.gaitovrat.dev`, `test.gaitovrat.dev` | you, signing in with GitHub (sent straight to GitHub) |
 | `files.gaitovrat.dev` | you with GitHub, and the allowed emails with a one-time PIN by email |
 
 The emails and the GitHub OAuth App credentials are sensitive variables, kept out of this public repo. One-time setup:

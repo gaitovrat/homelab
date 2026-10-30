@@ -47,6 +47,11 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
 
   config = {
     ingress = [
+      # The apex (landing page) goes to Traefik too; the wildcard doesn't match it.
+      {
+        hostname = var.zone_name
+        service  = var.tunnel_origin
+      },
       # Every subdomain goes to Traefik, so adding an app needs only an Ingress.
       {
         hostname = "*.${var.zone_name}"
@@ -70,6 +75,17 @@ data "cloudflare_zero_trust_tunnel_cloudflared_token" "homelab" {
 resource "cloudflare_dns_record" "wildcard" {
   zone_id = local.zone_id
   name    = "*.${var.zone_name}"
+  type    = "CNAME"
+  content = "${cloudflare_zero_trust_tunnel_cloudflared.homelab.id}.cfargotunnel.com"
+  proxied = true
+  ttl     = 1 # automatic; required for proxied records
+  comment = "Cloudflare Tunnel ${var.tunnel_name} (managed by Terraform)"
+}
+
+# The wildcard doesn't cover the apex. Cloudflare flattens a CNAME there.
+resource "cloudflare_dns_record" "apex" {
+  zone_id = local.zone_id
+  name    = var.zone_name
   type    = "CNAME"
   content = "${cloudflare_zero_trust_tunnel_cloudflared.homelab.id}.cfargotunnel.com"
   proxied = true
