@@ -21,6 +21,8 @@ tofu apply
 - **PR:** `fmt`, `validate` and `plan`. The PR gets one comment, updated on each push, listing which resources change and how, with no values: the repo is public, and comments aren't masked like the run log. The full plan is in the run log.
 - **Merge to `main`:** `plan` and `apply` in the `cloudflare` environment, which waits for your approval and only deploys from `main`.
 
+`www.gaitovrat.dev` redirects (301, path and query kept) to `gaitovrat.dev` with a Single Redirect rule in [`main.tf`](main.tf). The API token needs Zone → Single Redirect → Edit for it.
+
 Credentials are the repo's Actions secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. Run by hand only to debug, or when CI is broken.
 
 ## Access
