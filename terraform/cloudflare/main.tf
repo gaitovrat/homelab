@@ -92,3 +92,32 @@ resource "cloudflare_dns_record" "apex" {
   ttl     = 1 # automatic; required for proxied records
   comment = "Cloudflare Tunnel ${var.tunnel_name} (managed by Terraform)"
 }
+
+# Redirects
+
+# www → apex. Runs at the edge before Access, so www needs no Access app; the
+# wildcard DNS record already makes www resolve and get proxied.
+resource "cloudflare_ruleset" "redirects" {
+  zone_id = local.zone_id
+  name    = "Redirects"
+  kind    = "zone"
+  phase   = "http_request_dynamic_redirect"
+
+  rules = [
+    {
+      ref         = "www_to_apex"
+      description = "www.${var.zone_name} → ${var.zone_name}"
+      expression  = "(http.host eq \"www.${var.zone_name}\")"
+      action      = "redirect"
+      action_parameters = {
+        from_value = {
+          status_code = 301
+          target_url = {
+            expression = "concat(\"https://${var.zone_name}\", http.request.uri.path)"
+          }
+          preserve_query_string = true
+        }
+      }
+    },
+  ]
+}
