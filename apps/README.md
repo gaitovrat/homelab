@@ -14,6 +14,10 @@ Argo CD Applications, one file per component. The root app ([`root.yaml`](root.y
 - **UI:** https://argocd.gaitovrat.dev, behind Cloudflare Access (you only, GitHub login; see [`terraform/cloudflare`](../terraform/cloudflare/README.md#access)). Then **Log in via Cloudflare Access**: Access is also Argo CD's OIDC provider, so it reuses the same session. RBAC gives `role:admin` to your Access user ID (the token's `sub`) and nothing to anyone else. The client secret is the SealedSecret in [`manifests/argocd-oidc`](../manifests/argocd-oidc), synced by [`argocd-oidc.yaml`](argocd-oidc.yaml). TLS ends at Cloudflare, so the server runs with `server.insecure` and Traefik routes plain HTTP to it.
 - **CLI:** `argocd` from the dev shell, in core mode: it talks to the Kubernetes API over Tailscale with the repo's kubeconfig, so it skips Access and needs no Argo CD login. Point the context at the `argocd` namespace once (`kubens argocd`), then e.g. `argocd app list --core`, `argocd app sync <app> --core`, or `argocd admin dashboard` for the UI on localhost.
 
+## Landing page
+
+[`landing.yaml`](landing.yaml) → [`manifests/landing`](../manifests/landing): a static page at https://gaitovrat.dev with a card for every service, served by nginx (about 5 MB of RAM), behind Cloudflare Access (you only). The page is [`index.html`](../manifests/landing/index.html); Kustomize turns it into a ConfigMap whose name changes with its content, so a merged edit rolls the pod. When you expose a new app, add a card there. The apex needs its own tunnel rule and DNS record (the `*.gaitovrat.dev` ones don't match it), both in [`terraform/cloudflare`](../terraform/cloudflare/main.tf).
+
 ## FileBrowser
 
 [`filebrowser.yaml`](filebrowser.yaml) → [`manifests/filebrowser`](../manifests/filebrowser): FileBrowser Quantum at https://files.gaitovrat.dev, serving the USB HDD (`/mnt/disks/hdd1`, exFAT, uid 1000) with its database, index and thumbnails on a `local-path` volume.

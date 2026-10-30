@@ -1,4 +1,5 @@
-# Cloudflare Access (Zero Trust, free plan) in front of the admin and file apps.
+# Cloudflare Access (Zero Trust, free plan) in front of the landing page, admin
+# and file apps.
 # You sign in with GitHub; people on the allowlist get a one-time PIN by email,
 # and only for FileBrowser. Emails and the GitHub OAuth App secret come from
 # sensitive variables (1Password locally, Actions secrets in CI), never Git.
@@ -57,8 +58,14 @@ resource "cloudflare_zero_trust_access_policy" "allowed" {
 
 # Applications
 
+# Keyed by subdomain; "@" is the apex.
 locals {
   access_apps = {
+    # Landing page linking to the apps below.
+    "@" = {
+      name           = "Landing page"
+      allowed_emails = false
+    }
     argocd = {
       name           = "Argo CD"
       allowed_emails = false
@@ -84,7 +91,7 @@ resource "cloudflare_zero_trust_access_application" "this" {
 
   account_id       = local.account_id
   name             = each.value.name
-  domain           = "${each.key}.${var.zone_name}"
+  domain           = each.key == "@" ? var.zone_name : "${each.key}.${var.zone_name}"
   type             = "self_hosted"
   session_duration = "24h"
 
