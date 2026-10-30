@@ -1,5 +1,5 @@
 # Landing page at https://gaitovrat.dev: a static page linking to every
-# service, served by nginx, behind Cloudflare Access.
+# service, served by nginx. Public: each linked app has its own Access login.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
