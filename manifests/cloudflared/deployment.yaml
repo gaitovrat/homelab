@@ -32,6 +32,11 @@ spec:
             # /ready (200 once connected to the edge) and Prometheus metrics.
             - --metrics
             - 0.0.0.0:2000
+            # TCP instead of the QUIC default: the Pi's QUIC (UDP) connections
+            # went stale silently and requests hung until a reconnect
+            # (homelab-tasks#51).
+            - --protocol
+            - http2
             - run
           env:
             - name: TUNNEL_TOKEN
