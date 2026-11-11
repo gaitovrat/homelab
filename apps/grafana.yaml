@@ -99,6 +99,371 @@ spec:
         # doesn't bump these; update the ref by hand).
         dashboards:
           default:
+            # Own dashboard: Pi SoC temperature and CPU clock, so a hot or
+            # throttling Pi shows at a glance. The Pi 4 firmware starts
+            # throttling at 80 °C and caps hard at 85 °C; a drop in the clock
+            # while it's hot is that throttling.
+            pi-temperature:
+              json: |
+                {
+                  "uid": "pi-temperature",
+                  "title": "Pi temperature",
+                  "tags": [
+                    "homelab"
+                  ],
+                  "timezone": "browser",
+                  "refresh": "1m",
+                  "time": {
+                    "from": "now-24h",
+                    "to": "now"
+                  },
+                  "schemaVersion": 39,
+                  "panels": [
+                    {
+                      "type": "stat",
+                      "title": "SoC temperature now",
+                      "gridPos": {
+                        "x": 0,
+                        "y": 0,
+                        "w": 6,
+                        "h": 5
+                      },
+                      "datasource": {
+                        "type": "prometheus",
+                        "uid": "victoriametrics"
+                      },
+                      "targets": [
+                        {
+                          "refId": "A",
+                          "expr": "max by (instance) (node_thermal_zone_temp{job=\"node-exporter\"})",
+                          "legendFormat": "{{instance}}",
+                          "instant": true
+                        }
+                      ],
+                      "options": {
+                        "reduceOptions": {
+                          "calcs": [
+                            "lastNotNull"
+                          ]
+                        },
+                        "colorMode": "background",
+                        "graphMode": "none"
+                      },
+                      "fieldConfig": {
+                        "defaults": {
+                          "unit": "celsius",
+                          "decimals": 1,
+                          "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                              {
+                                "color": "green",
+                                "value": null
+                              },
+                              {
+                                "color": "yellow",
+                                "value": 65
+                              },
+                              {
+                                "color": "orange",
+                                "value": 75
+                              },
+                              {
+                                "color": "red",
+                                "value": 80
+                              }
+                            ]
+                          }
+                        },
+                        "overrides": []
+                      }
+                    },
+                    {
+                      "type": "stat",
+                      "title": "Hottest in range",
+                      "gridPos": {
+                        "x": 6,
+                        "y": 0,
+                        "w": 6,
+                        "h": 5
+                      },
+                      "datasource": {
+                        "type": "prometheus",
+                        "uid": "victoriametrics"
+                      },
+                      "targets": [
+                        {
+                          "refId": "A",
+                          "expr": "max by (instance) (max_over_time(node_thermal_zone_temp{job=\"node-exporter\"}[$__range]))",
+                          "legendFormat": "{{instance}}",
+                          "instant": true
+                        }
+                      ],
+                      "options": {
+                        "reduceOptions": {
+                          "calcs": [
+                            "lastNotNull"
+                          ]
+                        },
+                        "colorMode": "value",
+                        "graphMode": "none"
+                      },
+                      "fieldConfig": {
+                        "defaults": {
+                          "unit": "celsius",
+                          "decimals": 1,
+                          "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                              {
+                                "color": "green",
+                                "value": null
+                              },
+                              {
+                                "color": "yellow",
+                                "value": 65
+                              },
+                              {
+                                "color": "orange",
+                                "value": 75
+                              },
+                              {
+                                "color": "red",
+                                "value": 80
+                              }
+                            ]
+                          }
+                        },
+                        "overrides": []
+                      }
+                    },
+                    {
+                      "type": "stat",
+                      "title": "CPU clock now",
+                      "description": "Average over the cores. Below the maximum under load while hot means the firmware is throttling.",
+                      "gridPos": {
+                        "x": 12,
+                        "y": 0,
+                        "w": 6,
+                        "h": 5
+                      },
+                      "datasource": {
+                        "type": "prometheus",
+                        "uid": "victoriametrics"
+                      },
+                      "targets": [
+                        {
+                          "refId": "A",
+                          "expr": "avg by (instance) (node_cpu_scaling_frequency_hertz{job=\"node-exporter\"})",
+                          "legendFormat": "{{instance}}",
+                          "instant": true
+                        }
+                      ],
+                      "options": {
+                        "reduceOptions": {
+                          "calcs": [
+                            "lastNotNull"
+                          ]
+                        },
+                        "colorMode": "none",
+                        "graphMode": "none"
+                      },
+                      "fieldConfig": {
+                        "defaults": {
+                          "unit": "hertz",
+                          "decimals": 2
+                        },
+                        "overrides": []
+                      }
+                    },
+                    {
+                      "type": "stat",
+                      "title": "CPU usage now",
+                      "gridPos": {
+                        "x": 18,
+                        "y": 0,
+                        "w": 6,
+                        "h": 5
+                      },
+                      "datasource": {
+                        "type": "prometheus",
+                        "uid": "victoriametrics"
+                      },
+                      "targets": [
+                        {
+                          "refId": "A",
+                          "expr": "1 - avg by (instance) (rate(node_cpu_seconds_total{job=\"node-exporter\", mode=\"idle\"}[$__rate_interval]))",
+                          "legendFormat": "{{instance}}",
+                          "instant": true
+                        }
+                      ],
+                      "options": {
+                        "reduceOptions": {
+                          "calcs": [
+                            "lastNotNull"
+                          ]
+                        },
+                        "colorMode": "none",
+                        "graphMode": "none"
+                      },
+                      "fieldConfig": {
+                        "defaults": {
+                          "unit": "percentunit",
+                          "decimals": 0,
+                          "min": 0,
+                          "max": 1
+                        },
+                        "overrides": []
+                      }
+                    },
+                    {
+                      "type": "timeseries",
+                      "title": "SoC temperature",
+                      "description": "Dashed lines: 80 °C, where the firmware starts throttling, and 85 °C, its hard limit.",
+                      "gridPos": {
+                        "x": 0,
+                        "y": 5,
+                        "w": 24,
+                        "h": 10
+                      },
+                      "datasource": {
+                        "type": "prometheus",
+                        "uid": "victoriametrics"
+                      },
+                      "targets": [
+                        {
+                          "refId": "A",
+                          "expr": "max by (instance) (node_thermal_zone_temp{job=\"node-exporter\"})",
+                          "legendFormat": "{{instance}}"
+                        }
+                      ],
+                      "options": {
+                        "legend": {
+                          "displayMode": "table",
+                          "placement": "bottom",
+                          "calcs": [
+                            "min",
+                            "mean",
+                            "max",
+                            "lastNotNull"
+                          ]
+                        },
+                        "tooltip": {
+                          "mode": "multi"
+                        }
+                      },
+                      "fieldConfig": {
+                        "defaults": {
+                          "unit": "celsius",
+                          "decimals": 1,
+                          "min": 30,
+                          "max": 90,
+                          "custom": {
+                            "lineWidth": 2,
+                            "fillOpacity": 10,
+                            "thresholdsStyle": {
+                              "mode": "dashed"
+                            }
+                          },
+                          "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                              {
+                                "color": "transparent",
+                                "value": null
+                              },
+                              {
+                                "color": "orange",
+                                "value": 80
+                              },
+                              {
+                                "color": "red",
+                                "value": 85
+                              }
+                            ]
+                          }
+                        },
+                        "overrides": []
+                      }
+                    },
+                    {
+                      "type": "timeseries",
+                      "title": "CPU clock and usage",
+                      "gridPos": {
+                        "x": 0,
+                        "y": 15,
+                        "w": 24,
+                        "h": 8
+                      },
+                      "datasource": {
+                        "type": "prometheus",
+                        "uid": "victoriametrics"
+                      },
+                      "targets": [
+                        {
+                          "refId": "A",
+                          "expr": "avg by (instance) (node_cpu_scaling_frequency_hertz{job=\"node-exporter\"})",
+                          "legendFormat": "clock {{instance}}"
+                        },
+                        {
+                          "refId": "B",
+                          "expr": "1 - avg by (instance) (rate(node_cpu_seconds_total{job=\"node-exporter\", mode=\"idle\"}[$__rate_interval]))",
+                          "legendFormat": "usage {{instance}}"
+                        }
+                      ],
+                      "options": {
+                        "legend": {
+                          "displayMode": "list",
+                          "placement": "bottom"
+                        },
+                        "tooltip": {
+                          "mode": "multi"
+                        }
+                      },
+                      "fieldConfig": {
+                        "defaults": {
+                          "unit": "hertz",
+                          "decimals": 2,
+                          "min": 0,
+                          "custom": {
+                            "lineWidth": 2,
+                            "fillOpacity": 0
+                          }
+                        },
+                        "overrides": [
+                          {
+                            "matcher": {
+                              "id": "byFrameRefID",
+                              "options": "B"
+                            },
+                            "properties": [
+                              {
+                                "id": "unit",
+                                "value": "percentunit"
+                              },
+                              {
+                                "id": "decimals",
+                                "value": 0
+                              },
+                              {
+                                "id": "max",
+                                "value": 1
+                              },
+                              {
+                                "id": "custom.axisPlacement",
+                                "value": "right"
+                              },
+                              {
+                                "id": "custom.fillOpacity",
+                                "value": 10
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
             # Host details, including temperatures (Hardware Misc).
             node-exporter-full:
               url: https://raw.githubusercontent.com/rfmoz/grafana-dashboards/6c2de7ebaea4dd1dad7089d86d75de71417a3d0b/prometheus/node-exporter-full.json

@@ -86,7 +86,7 @@ Check: `kubectl --context homelab get sealedsecrets -A` shows every SealedSecret
 
 ## Monitoring
 
-- **Grafana** at https://stats.gaitovrat.dev (behind Cloudflare Access, you only): host, cluster, namespace, node and pod dashboards with 30 days of history, Pi temperature under *Node Exporter Full → Hardware Misc*. Read-only, set up from Git; see [`apps/README.md`](apps/README.md#monitoring).
+- **Grafana** at https://stats.gaitovrat.dev (behind Cloudflare Access, you only): host, cluster, namespace, node and pod dashboards with 30 days of history, Pi temperature and CPU clock (to spot throttling) on the *Pi temperature* dashboard. Read-only, set up from Git; see [`apps/README.md`](apps/README.md#monitoring).
 - **From the dev shell**, live numbers from the metrics-server bundled with k3s (latest sample only, no history):
 
 ```sh
