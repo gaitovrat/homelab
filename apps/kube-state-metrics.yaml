@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: ghcr.io/prometheus-community/charts
     chart: kube-state-metrics
-    targetRevision: 9.0.1
+    targetRevision: 9.1.0
     helm:
       releaseName: kube-state-metrics
       valuesObject:
